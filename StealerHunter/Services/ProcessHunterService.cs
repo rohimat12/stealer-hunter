@@ -27,8 +27,8 @@ public class ProcessHunterService
 
         logCallback?.Invoke("INFO", "Inspecting active processes and memory space...");
 
-        // Retrieve process command lines via WMI
-        var commandLines = GetProcessCommandLines();
+        // Retrieve process WMI metadata (CommandLines, PPID, Parent Information)
+        var wmiProcesses = GetProcessWmiInfo();
 
         var runningProcesses = Process.GetProcesses();
         foreach (var proc in runningProcesses)
@@ -48,8 +48,9 @@ public class ProcessHunterService
                 }
 
                 var procName = proc.ProcessName;
-                commandLines.TryGetValue(proc.Id, out var cmdLine);
-                cmdLine ??= string.Empty;
+                wmiProcesses.TryGetValue(proc.Id, out var wmiInfo);
+                var cmdLine = wmiInfo?.CommandLine ?? string.Empty;
+                var ppid = wmiInfo?.ParentProcessId ?? 0;
 
                 // 0. Check against Known Malware Database Signatures (Abuse.ch MalwareBazaar)
                 if (!string.IsNullOrEmpty(exePath) && dbService != null)
@@ -72,7 +73,54 @@ public class ProcessHunterService
                     }
                 }
 
-                // 1. Check for Masquerading System Processes & Resources directory abuse
+                // 1. Parent Process ID (PPID) Integrity Verification (Mitre ATT&CK T1036 / T1055)
+                if (ppid > 0 && wmiProcesses.TryGetValue(ppid, out var parentInfo))
+                {
+                    var parentName = parentInfo.Name?.ToLowerInvariant() ?? string.Empty;
+
+                    // svchost.exe MUST be spawned by services.exe
+                    if (procName.Equals("svchost", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrEmpty(parentName) && !parentName.Equals("services.exe", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var threat = new ThreatItem
+                            {
+                                Name = $"Spoofed Svchost Process (Rogue Parent: {parentInfo.Name})",
+                                Category = ThreatCategory.SuspiciousProcess,
+                                Severity = ThreatSeverity.Critical,
+                                Description = $"svchost.exe (PID {proc.Id}) was spawned by '{parentInfo.Name}' (PID {ppid}) instead of services.exe. Infostealers frequently spoof svchost.exe to bypass firewalls and disguise exfiltration.",
+                                FilePath = exePath ?? "svchost.exe",
+                                ProcessId = proc.Id,
+                                TargetTarget = "PPID Spoofing (MITRE ATT&CK T1036)"
+                            };
+                            threats.Add(threat);
+                            logCallback?.Invoke("DANGER", $"[CRITICAL PPID] svchost.exe (PID {proc.Id}) spawned by rogue parent '{parentInfo.Name}' (PID {ppid})!");
+                            continue;
+                        }
+                    }
+                    // services.exe MUST be spawned by wininit.exe
+                    else if (procName.Equals("services", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrEmpty(parentName) && !parentName.Equals("wininit.exe", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var threat = new ThreatItem
+                            {
+                                Name = $"Rogue Services Process (Parent: {parentInfo.Name})",
+                                Category = ThreatCategory.SuspiciousProcess,
+                                Severity = ThreatSeverity.Critical,
+                                Description = $"services.exe (PID {proc.Id}) has illegitimate parent '{parentInfo.Name}' (PID {ppid}). Expected wininit.exe.",
+                                FilePath = exePath ?? "services.exe",
+                                ProcessId = proc.Id,
+                                TargetTarget = "Core System Integrity / PPID Spoofing"
+                            };
+                            threats.Add(threat);
+                            logCallback?.Invoke("DANGER", $"[CRITICAL PPID] services.exe (PID {proc.Id}) spawned by rogue parent '{parentInfo.Name}'!");
+                            continue;
+                        }
+                    }
+                }
+
+                // 2. Check for Masquerading System Processes & Resources directory abuse
                 if (!string.IsNullOrEmpty(exePath))
                 {
                     var dir = Path.GetDirectoryName(exePath) ?? "";
@@ -241,20 +289,30 @@ public class ProcessHunterService
         return (hasHidden && (hasEncoded || hasDownload)) || (hasEncoded && hasBypass);
     }
 
-    private static Dictionary<int, string> GetProcessCommandLines()
+    private static Dictionary<int, ProcessWmiInfo> GetProcessWmiInfo()
     {
-        var result = new Dictionary<int, string>();
+        var result = new Dictionary<int, ProcessWmiInfo>();
         try
         {
-            using var searcher = new ManagementObjectSearcher("SELECT ProcessId, CommandLine FROM Win32_Process");
+            using var searcher = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, Name, CommandLine FROM Win32_Process");
             using var objects = searcher.Get();
 
             foreach (var obj in objects)
             {
-                if (obj["ProcessId"] is uint pid && obj["CommandLine"] is string cmd)
+                int pid = obj["ProcessId"] is uint p ? (int)p : 0;
+                if (pid == 0) continue;
+
+                int ppid = obj["ParentProcessId"] is uint pp ? (int)pp : 0;
+                string name = obj["Name"] as string ?? string.Empty;
+                string cmd = obj["CommandLine"] as string ?? string.Empty;
+
+                result[pid] = new ProcessWmiInfo
                 {
-                    result[(int)pid] = cmd;
-                }
+                    ProcessId = pid,
+                    ParentProcessId = ppid,
+                    Name = name,
+                    CommandLine = cmd
+                };
             }
         }
         catch
@@ -264,4 +322,12 @@ public class ProcessHunterService
 
         return result;
     }
+}
+
+public class ProcessWmiInfo
+{
+    public int ProcessId { get; set; }
+    public int ParentProcessId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string CommandLine { get; set; } = string.Empty;
 }

@@ -73,18 +73,19 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
    * **Minimize to System Tray**: Bersembunyi di area notifikasi pojok kanan bawah dengan menu konteks klik kanan.
    * **Boot Quick Scan**: Pemindaian otomatis seketika saat komputer dinyalakan.
 
-2. **Realtime %TEMP% & Staging Watcher (64KB Buffer Protection)**:
-   * Memantau folder `%TEMP%` dan staging directory menggunakan `FileSystemWatcher` dengan buffer berkecepatan tinggi **64 KB** untuk mencegah *buffer overflow* saat I/O sistem padat.
-   * Memergoki pembuatan file dump curian (`passwords.txt`, `cookies.txt`, `wallets`, atau arsip zip mencurigakan) dan memicu penanganan darurat seketika.
+2. **Realtime %TEMP% & Staging Watcher (64KB Buffer & Shannon Entropy Engine)**:
+   * **Shannon Entropy Analysis**: Menghitung tingkat keacakan (*entropy*) berkas baru di folder `%TEMP%`. Berkas teks normal memiliki entropi 3.0–5.0; berkas hasil enkripsi/obfuscation malware (seperti Lumma/Stealc) yang disamarkan sebagai `.txt`, `.tmp`, atau `.dat` dengan entropi tinggi (≥ 7.15) akan langsung terdeteksi sebagai muatan eksfiltrasi curian.
+   * **Buffer Kapasitas Tinggi 64 KB**: Mencegah terjadinya *InternalBufferOverflowException* saat aktivitas berkas sistem sedang padat.
+   * Memergoki pembuatan file dump curian (`passwords.txt`, `cookies.txt`, `wallets`, atau arsip zip mencurigakan).
 
 3. **Browser Vault Integrity Shield**:
    * Memeriksa integritas database kredensial untuk **Google Chrome, Microsoft Edge, Brave, Mozilla Firefox, Opera Stable, Opera GX, dan Vivaldi**.
    * Mendeteksi penguncian berkas (*file lock*) mencurigakan oleh program asing di saat browser sedang ditutup.
 
-4. **Process & Memory Hunter (Authenticode Digital Signature Verification)**:
-   * **Validasi Tanda Tangan Digital Resmi (X509)**: Memverifikasi sertifikat digital vendor terpercaya (Microsoft, Google, Acer, NVIDIA, Valve, dll.) untuk meniadakan *false positive* pada updater resmi.
+4. **Process & Memory Hunter (Digital Signature & PPID Verification)**:
+   * **Parent Process ID (PPID) Integrity (MITRE ATT&CK T1036/T1055)**: Memverifikasi keabsahan rantai induk-anak proses Windows (contoh: `svchost.exe` wajib berinduk pada `services.exe`). Jika `svchost.exe` dipicu oleh `cmd.exe`, `powershell.exe`, atau aplikasi asing, sistem langsung menandainya sebagai *Process Masquerading/Spoofing*.
+   * **Validasi Tanda Tangan Digital Resmi (X509 / Authenticode)**: Memverifikasi sertifikat digital vendor terpercaya (Microsoft, Google, Acer, NVIDIA, Valve, dll.) untuk meniadakan *false positive* pada updater resmi.
    * **Isolasi Berkas Unsigned/Tanpa Sertifikat**: Memindai dan menandai proses asing tanpa tanda tangan digital yang berjalan dari lokasi berisiko (`%TEMP%`, `%APPDATA%`, `Downloads`, `Public`).
-   * Mendeteksi proses yang menyamar (*masquerading system processes* seperti `svchost.exe` palsu).
    * Mendeteksi eksekusi skrip tersembunyi (PowerShell `-w hidden -enc`, skrip obfuscated).
 
 5. **Persistence & Autorun Hunter**:
@@ -101,6 +102,8 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
 
 8. **Dual-Engine Threat Intelligence (Abuse.ch MalwareBazaar Integration)**:
    * **1,230+ Hash Signatures**: Terintegrasi langsung dengan database signature ancaman global dari **Abuse.ch MalwareBazaar**.
+   * **Rate-Limit (HTTP 429) Failover & Backoff**: Mekanisme penanganan pembatasan frekuensi dengan peralihan endpoint otomatis (*endpoint failover*) dan jeda *backoff*.
+   * **Thread-Safe Chunk-Based Loading**: Pemuatan streaming data bertahap (*chunking*) untuk menjaga antarmuka pengguna (UI) tetap 100% responsif tanpa *freeze*.
    * **Live Threat DB Updater**: Fitur pembaruan daring (*Live Update*) sekali klik untuk mengunduh intelijen malware teranyar dari server siber.
    * **Memory & Directory Hash Matching**: Memvalidasi hash SHA-256 seluruh proses aktif dan direktori berisiko tinggi dengan pencarian instan O(1).
 

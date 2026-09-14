@@ -129,6 +129,41 @@ public class StagedDataHunter
                     // Ignore locked zips
                 }
             }
+
+            // Also check for high-entropy obfuscated/encrypted credential dumps (Lumma, Stealc staging)
+            var candidateFiles = Directory.GetFiles(rootDir, "*.*");
+            foreach (var candidate in candidateFiles)
+            {
+                var ext = Path.GetExtension(candidate).ToLowerInvariant();
+                if (ext is ".txt" or ".tmp" or ".dat" or ".bin" or ".log")
+                {
+                    try
+                    {
+                        var fi = new FileInfo(candidate);
+                        if (fi.Length is >= 512 and <= 20_000_000 && (now - fi.LastWriteTime).TotalDays <= 7)
+                        {
+                            if (EntropyHelper.IsSuspiciousHighEntropyStaging(candidate, out var entropy))
+                            {
+                                var threat = new ThreatItem
+                                {
+                                    Name = $"Encrypted Staging Dump: {Path.GetFileName(candidate)}",
+                                    Category = ThreatCategory.StagedExfiltrationData,
+                                    Severity = ThreatSeverity.Critical,
+                                    Description = $"High-entropy staging file detected (Shannon Entropy: {entropy:F2}/8.00). Infostealers (Lumma/Stealc) obfuscate dumped credentials in temp files prior to exfiltration: '{candidate}'",
+                                    FilePath = candidate,
+                                    TargetTarget = "Encrypted Exfiltration Dump"
+                                };
+                                threats.Add(threat);
+                                logCallback?.Invoke("DANGER", $"[CRITICAL] High-entropy encrypted dump: {candidate} (Entropy: {entropy:F2})");
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore locked or inaccessible files
+                    }
+                }
+            }
         }
         catch
         {

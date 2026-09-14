@@ -102,6 +102,23 @@ public class RealtimeWatcherService : IDisposable
                     $"Suspicious file creation in Temp folder: '{e.Name}'",
                     e.FullPath
                 );
+                return;
+            }
+
+            // High-entropy encrypted credential staging detection (Lumma, Stealc mutation)
+            if (File.Exists(e.FullPath))
+            {
+                var ext = Path.GetExtension(name);
+                if (ext is ".txt" or ".tmp" or ".dat" or ".log" or ".bin")
+                {
+                    if (EntropyHelper.IsSuspiciousHighEntropyStaging(e.FullPath, out var entropy))
+                    {
+                        SuspiciousActivityDetected?.Invoke(
+                            $"Encrypted/Obfuscated Staging Dump: '{e.Name}' (Shannon Entropy: {entropy:F2}/8.00)",
+                            e.FullPath
+                        );
+                    }
+                }
             }
         }
         catch
