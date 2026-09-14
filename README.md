@@ -56,6 +56,18 @@ Pengaturan integrasi sistem Windows: pendaftaran autorun saat booting (dengan mo
 
 ---
 
+## 💡 Latar Belakang & Asal-Muasal Proyek
+
+> *"Software pertahanan terbaik sering kali lahir dari sebuah insiden nyata."*
+
+**StealerHunter** awalnya tidak direncanakan sebagai proyek publik. Proyek ini lahir dari sebuah insiden nyata ketika laptop pengembang dan rekannya terinfeksi oleh varian baru **Infostealer** yang menyusup secara licik melalui **file kustomisasi tema Windows (`.theme` / `.themepack`)**.
+
+Malware tersebut berhasil mengelabui antivirus konvensional, mengeksekusi muatan siluman di latar belakang, dan mencoba membobol kredensial sesi peramban (*browser session cookies*) serta berkas dompet digital.
+
+Karena antivirus bawaan lambat merespons pola serangan *hit-and-run* ini, dibangunlah serangkaian alat deteksi dan mitigasi mandiri yang kemudian disatukan menjadi **StealerHunter**. Setelah berhasil membersihkan sistem korban secara tuntas dan mengisolasi seluruh muatan jahatnya, diputuskan untuk mematangkan dan merilis StealerHunter sebagai perangkat lunak **100% gratis dan open-source** agar siapa pun yang mengalami insiden serupa dapat menyelamatkan akun dan data pribadi mereka.
+
+---
+
 ## 🎯 Mengapa Dikhususkan untuk Infostealer?
 Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
 1. **Menyerang Berkas Kredensial Browser**: Menyasar database SQLite (`Login Data`, `Cookies`, `Web Data`, `Local State`).
