@@ -123,6 +123,20 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
 
 ---
 
+## 🖥️ Persyaratan & Rekomendasi Sistem
+
+| Komponen | Minimum | Direkomendasikan |
+|---|---|---|
+| **Sistem Operasi** | Windows 10 (versi 1809+, 64-bit) | Windows 10 / 11 (64-bit) terbaru |
+| **Arsitektur** | x64 (64-bit) | x64 (64-bit) |
+| **Hak Akses** | Akun Pengguna Standar | **Administrator** *(Diperlukan untuk Deep MFT Scan & pembersihan proses terkunci)* |
+| **Prosesor (CPU)** | Dual-Core 1.6 GHz | Quad-Core 2.0 GHz atau lebih cepat |
+| **Memori (RAM)** | 2 GB RAM | 4 GB RAM atau lebih |
+| **Ruang Penyimpanan** | 100 MB ruang kosong | 200 MB ruang kosong (untuk log & folder karantina) |
+| **Runtime Tambahan** | **Tidak ada** *(Versi installer sudah Full Standalone .NET 8)* | **Tidak ada** |
+
+---
+
 ## 💻 Cara Menggunakan & Instalasi
 
 ### 1. Menggunakan File Installer (Rekomendasi Pengguna)
