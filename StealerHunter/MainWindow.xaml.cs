@@ -81,14 +81,20 @@ public partial class MainWindow : Window
         base.OnClosing(e);
     }
 
-    private void RestoreWindow()
+    public void RestoreWindow()
     {
         Dispatcher.Invoke(() =>
         {
             Show();
-            WindowState = WindowState.Normal;
+            if (WindowState == WindowState.Minimized)
+            {
+                WindowState = WindowState.Normal;
+            }
             ShowInTaskbar = true;
             Activate();
+            Topmost = true;
+            Topmost = false;
+            Focus();
         });
     }
 
