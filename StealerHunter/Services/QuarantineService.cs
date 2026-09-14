@@ -80,6 +80,22 @@ public class QuarantineService
         return name;
     }
 
+    public static bool IsPathInsideQuarantineDirectory(string? path, string? customQuarantineDir = null)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var targetDir = customQuarantineDir ?? QuarantineDir;
+            var qDir = Path.GetFullPath(targetDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var fullPath = Path.GetFullPath(path);
+            return fullPath.StartsWith(qDir, StringComparison.OrdinalIgnoreCase) && fullPath.EndsWith(".quarantined", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static bool IsProtectedBrowserCredentialFile(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;

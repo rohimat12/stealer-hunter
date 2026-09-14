@@ -140,7 +140,7 @@ public class SecurityServicesTests
         thread.Start();
         thread.Join();
 
-        Assert.IsNull(threadException, $"Rendering Live Logs tab failed with exception: {threadException?.Message}");
+        Assert.IsNull(threadException, $"Rendering Live Logs tab failed with exception: {threadException}");
     }
 
     [TestMethod]
@@ -360,7 +360,7 @@ public class SecurityServicesTests
     [TestMethod]
     public void TestScanButtonStateManagement()
     {
-        var vm = new StealerHunter.ViewModels.MainViewModel();
+        var vm = new StealerHunter.ViewModels.MainViewModel(isTestMode: true);
 
         // Initially idle
         Assert.IsFalse(vm.IsScanning, "IsScanning should be false initially");
@@ -389,7 +389,7 @@ public class SecurityServicesTests
     [TestMethod]
     public void TestScanProgressTextFormatting()
     {
-        var vm = new StealerHunter.ViewModels.MainViewModel();
+        var vm = new StealerHunter.ViewModels.MainViewModel(isTestMode: true);
 
         vm.IsScanning = false;
         vm.ScanProgress = 0;
@@ -423,12 +423,55 @@ public class SecurityServicesTests
         var pattern3 = "simple_virus.dll.quarantined";
         Assert.AreEqual("simple_virus.dll", QuarantineService.ExtractOriginalFileName(pattern3));
 
-        // 2. Verify ViewModel integration
-        var vm = new StealerHunter.ViewModels.MainViewModel();
+        // 2. Verify ViewModel integration (with isolated test mode)
+        var vm = new StealerHunter.ViewModels.MainViewModel(isTestMode: true);
         Assert.IsNotNull(vm.QuarantinedItems);
         Assert.IsNotNull(vm.RefreshQuarantineCommand);
         Assert.IsNotNull(vm.RestoreVaultItemCommand);
         Assert.IsNotNull(vm.DeleteVaultItemCommand);
         Assert.IsNotNull(vm.EmptyVaultCommand);
+    }
+
+    [TestMethod]
+    public void TestQuarantinePathTraversalSafeguard()
+    {
+        var tempQuarantine = Path.Combine(Path.GetTempPath(), "SH_Vault_Test_" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            Directory.CreateDirectory(tempQuarantine);
+
+            var validQuarantineFile = Path.Combine(tempQuarantine, "20260915_053000_test_trojan.exe.quarantined");
+            var nonQuarantineExtension = Path.Combine(tempQuarantine, "trojan.exe");
+            var traversalEscape = Path.Combine(tempQuarantine, "..", "Windows", "System32", "calc.exe.quarantined");
+            var systemFile = @"C:\Windows\System32\notepad.exe";
+
+            // Valid file inside quarantine with .quarantined extension
+            Assert.IsTrue(QuarantineService.IsPathInsideQuarantineDirectory(validQuarantineFile, tempQuarantine),
+                "Valid .quarantined file inside quarantine directory must be accepted");
+
+            // Extension is not .quarantined
+            Assert.IsFalse(QuarantineService.IsPathInsideQuarantineDirectory(nonQuarantineExtension, tempQuarantine),
+                "File without .quarantined extension must be rejected");
+
+            // Path traversal attempt using .. to escape directory
+            Assert.IsFalse(QuarantineService.IsPathInsideQuarantineDirectory(traversalEscape, tempQuarantine),
+                "Directory traversal escaping quarantine root must be strictly rejected");
+
+            // Arbitrary system file
+            Assert.IsFalse(QuarantineService.IsPathInsideQuarantineDirectory(systemFile, tempQuarantine),
+                "System file outside quarantine must be rejected");
+
+            // Null or empty
+            Assert.IsFalse(QuarantineService.IsPathInsideQuarantineDirectory(null, tempQuarantine));
+            Assert.IsFalse(QuarantineService.IsPathInsideQuarantineDirectory(string.Empty, tempQuarantine));
+        }
+        finally
+        {
+            if (Directory.Exists(tempQuarantine))
+            {
+                try { Directory.Delete(tempQuarantine, true); } catch { }
+            }
+        }
     }
 }

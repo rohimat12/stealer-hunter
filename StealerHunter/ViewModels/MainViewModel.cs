@@ -40,7 +40,11 @@ public class MainViewModel : INotifyPropertyChanged
     private bool _hasActiveThreatAlert;
     private string _activeAlertMessage = string.Empty;
 
-    public MainViewModel()
+    public MainViewModel() : this(isTestMode: false)
+    {
+    }
+
+    public MainViewModel(bool isTestMode)
     {
         _settings = AppSettings.Load();
 
@@ -63,28 +67,38 @@ public class MainViewModel : INotifyPropertyChanged
         DismissAlertCommand = new RelayCommand(() => HasActiveThreatAlert = false);
         UpdateDatabaseCommand = new RelayCommand(async () => await UpdateDatabaseAsync(), () => !IsScanning && !IsUpdatingDatabase);
 
-        RefreshQuarantinedItems();
-
-        _runOnStartup = AutoStartupService.IsAutoStartEnabled();
-        _realtimeProtectionEnabled = _settings.RealtimeProtectionEnabled;
-        _startMinimizedToTray = _settings.StartMinimizedToTray;
-        _soundAlertOnThreat = _settings.SoundAlertOnThreat;
-
-        // Initialize Realtime watcher
-        _watcherService.SuspiciousActivityDetected += OnSuspiciousActivityDetected;
-        _watcherService.WatcherLog += (level, msg) => AddLog(level, msg);
-
-        if (_realtimeProtectionEnabled)
+        if (!isTestMode)
         {
-            _watcherService.Start();
+            RefreshQuarantinedItems();
+
+            _runOnStartup = AutoStartupService.IsAutoStartEnabled();
+            _realtimeProtectionEnabled = _settings.RealtimeProtectionEnabled;
+            _startMinimizedToTray = _settings.StartMinimizedToTray;
+            _soundAlertOnThreat = _settings.SoundAlertOnThreat;
+
+            // Initialize Realtime watcher
+            _watcherService.SuspiciousActivityDetected += OnSuspiciousActivityDetected;
+            _watcherService.WatcherLog += (level, msg) => AddLog(level, msg);
+
+            if (_realtimeProtectionEnabled)
+            {
+                _watcherService.Start();
+            }
+
+            // Initialize detected browsers
+            RefreshBrowsers();
+
+            AddLog("INFO", $"StealerHunter initialized. Loaded {_malwareDbService.TotalSignatures:N0} Abuse.ch/MalwareBazaar threat signatures.");
+            AddLog("INFO", $"Auto-Start on Boot is currently {(_runOnStartup ? "ENABLED" : "DISABLED")}.");
+            AddLog("INFO", $"Realtime Protection is {(_realtimeProtectionEnabled ? "ACTIVE" : "INACTIVE")}.");
         }
-
-        // Initialize detected browsers
-        RefreshBrowsers();
-
-        AddLog("INFO", $"StealerHunter initialized. Loaded {_malwareDbService.TotalSignatures:N0} Abuse.ch/MalwareBazaar threat signatures.");
-        AddLog("INFO", $"Auto-Start on Boot is currently {(_runOnStartup ? "ENABLED" : "DISABLED")}.");
-        AddLog("INFO", $"Realtime Protection is {(_realtimeProtectionEnabled ? "ACTIVE" : "INACTIVE")}.");
+        else
+        {
+            _realtimeProtectionEnabled = false;
+            _startMinimizedToTray = false;
+            _soundAlertOnThreat = false;
+            _runOnStartup = false;
+        }
     }
 
     public ObservableCollection<ThreatItem> DetectedThreats { get; }
@@ -600,10 +614,16 @@ public class MainViewModel : INotifyPropertyChanged
         RefreshQuarantinedItems();
     }
 
-    public void RestoreSingleThreat(ThreatItem? threat)
+    public async void RestoreSingleThreat(ThreatItem? threat)
     {
         if (threat == null || !threat.CanRestore || string.IsNullOrEmpty(threat.QuarantineBackupPath))
             return;
+
+        if (!QuarantineService.IsPathInsideQuarantineDirectory(threat.QuarantineBackupPath))
+        {
+            AddLog("DANGER", $"[VAULT SECURITY] Blocked restore: file is outside quarantine: {threat.QuarantineBackupPath}");
+            return;
+        }
 
         var confirm = System.Windows.MessageBox.Show(
             $"Are you sure you want to restore this file from quarantine?\n\nFile: {threat.FilePath}\n\n" +
@@ -614,7 +634,16 @@ public class MainViewModel : INotifyPropertyChanged
 
         if (confirm != System.Windows.MessageBoxResult.Yes) return;
 
-        bool restored = QuarantineService.RestoreQuarantinedFile(threat.QuarantineBackupPath, threat.FilePath, out var msg);
+        bool restored = false;
+        string msg = string.Empty;
+        string backupPath = threat.QuarantineBackupPath;
+        string targetPath = threat.FilePath;
+
+        await Task.Run(() =>
+        {
+            restored = QuarantineService.RestoreQuarantinedFile(backupPath, targetPath, out msg);
+        });
+
         if (restored)
         {
             threat.IsResolved = false;
@@ -632,18 +661,31 @@ public class MainViewModel : INotifyPropertyChanged
         RefreshQuarantinedItems();
     }
 
-    public void RefreshQuarantinedItems()
+    public async void RefreshQuarantinedItems()
     {
         try
         {
-            var items = QuarantineService.GetQuarantinedItems();
-            QuarantinedItems.Clear();
-            foreach (var item in items)
+            var items = await Task.Run(() => QuarantineService.GetQuarantinedItems());
+
+            void UpdateCollection()
             {
-                QuarantinedItems.Add(item);
+                QuarantinedItems.Clear();
+                foreach (var item in items)
+                {
+                    QuarantinedItems.Add(item);
+                }
+                OnPropertyChanged(nameof(QuarantinedCount));
+                ((RelayCommand)EmptyVaultCommand)?.RaiseCanExecuteChanged();
             }
-            OnPropertyChanged(nameof(QuarantinedCount));
-            ((RelayCommand)EmptyVaultCommand)?.RaiseCanExecuteChanged();
+
+            if (System.Windows.Application.Current?.Dispatcher != null && !System.Windows.Application.Current.Dispatcher.CheckAccess())
+            {
+                System.Windows.Application.Current.Dispatcher.Invoke(UpdateCollection);
+            }
+            else
+            {
+                UpdateCollection();
+            }
         }
         catch (Exception ex)
         {
@@ -651,9 +693,16 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public void RestoreVaultItem(QuarantinedItem? item)
+    public async void RestoreVaultItem(QuarantinedItem? item)
     {
         if (item == null || !File.Exists(item.FullPath)) return;
+
+        if (!QuarantineService.IsPathInsideQuarantineDirectory(item.FullPath))
+        {
+            AddLog("DANGER", $"[VAULT SECURITY] Blocked restore for unauthorized path: {item.FullPath}");
+            System.Windows.MessageBox.Show("Cannot restore file: Target path is outside the secure quarantine directory.", "Security Restriction", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            return;
+        }
 
         var confirm = System.Windows.MessageBox.Show(
             $"Are you sure you want to restore this file from quarantine?\n\n" +
@@ -675,19 +724,40 @@ public class MainViewModel : INotifyPropertyChanged
 
         if (sfd.ShowDialog() == true)
         {
-            bool success = QuarantineService.RestoreQuarantinedFile(item.FullPath, sfd.FileName, out var msg);
+            string destPath = sfd.FileName;
+            string fullPath = item.FullPath;
+            string originalFileName = item.OriginalFileName;
+
+            bool success = false;
+            string msg = string.Empty;
+
+            await Task.Run(() =>
+            {
+                success = QuarantineService.RestoreQuarantinedFile(fullPath, destPath, out msg);
+            });
+
             if (success)
             {
-                AddLog("SUCCESS", $"[VAULT RESTORE] {item.OriginalFileName} restored to: {sfd.FileName}");
+                AddLog("SUCCESS", $"[VAULT RESTORE] {originalFileName} restored to: {destPath}");
                 var deleteQuarantine = System.Windows.MessageBox.Show(
-                    $"File successfully restored to:\n{sfd.FileName}\n\nDo you want to delete the quarantined copy from the vault?",
+                    $"File successfully restored to:\n{destPath}\n\nDo you want to delete the quarantined copy from the vault?",
                     "Restore Succeeded",
                     System.Windows.MessageBoxButton.YesNo,
                     System.Windows.MessageBoxImage.Question);
 
                 if (deleteQuarantine == System.Windows.MessageBoxResult.Yes)
                 {
-                    try { File.Delete(item.FullPath); } catch { }
+                    await Task.Run(() =>
+                    {
+                        try
+                        {
+                            if (QuarantineService.IsPathInsideQuarantineDirectory(fullPath) && File.Exists(fullPath))
+                            {
+                                File.Delete(fullPath);
+                            }
+                        }
+                        catch { }
+                    });
                 }
                 RefreshQuarantinedItems();
             }
@@ -699,9 +769,16 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public void DeleteVaultItem(QuarantinedItem? item)
+    public async void DeleteVaultItem(QuarantinedItem? item)
     {
         if (item == null || !File.Exists(item.FullPath)) return;
+
+        if (!QuarantineService.IsPathInsideQuarantineDirectory(item.FullPath))
+        {
+            AddLog("DANGER", $"[VAULT SECURITY] Blocked deletion for unauthorized path: {item.FullPath}");
+            System.Windows.MessageBox.Show("Cannot delete file: Target path is outside the secure quarantine directory.", "Security Restriction", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            return;
+        }
 
         var confirm = System.Windows.MessageBox.Show(
             $"Permanently delete this quarantined file?\n\n" +
@@ -713,10 +790,20 @@ public class MainViewModel : INotifyPropertyChanged
 
         if (confirm == System.Windows.MessageBoxResult.Yes)
         {
+            string fullPath = item.FullPath;
+            string origName = item.OriginalFileName;
+
             try
             {
-                File.Delete(item.FullPath);
-                AddLog("WARN", $"[VAULT DELETED] Permanently removed: {item.OriginalFileName}");
+                await Task.Run(() =>
+                {
+                    if (QuarantineService.IsPathInsideQuarantineDirectory(fullPath) && File.Exists(fullPath))
+                    {
+                        File.Delete(fullPath);
+                    }
+                });
+
+                AddLog("WARN", $"[VAULT DELETED] Permanently removed: {origName}");
                 RefreshQuarantinedItems();
             }
             catch (Exception ex)
@@ -726,7 +813,7 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public void EmptyVault()
+    public async void EmptyVault()
     {
         if (!QuarantinedItems.Any()) return;
 
@@ -739,19 +826,25 @@ public class MainViewModel : INotifyPropertyChanged
 
         if (confirm == System.Windows.MessageBoxResult.Yes)
         {
+            var itemsToDelete = QuarantinedItems.ToList();
             int count = 0;
-            foreach (var item in QuarantinedItems.ToList())
+
+            await Task.Run(() =>
             {
-                try
+                foreach (var item in itemsToDelete)
                 {
-                    if (File.Exists(item.FullPath))
+                    try
                     {
-                        File.Delete(item.FullPath);
-                        count++;
+                        if (QuarantineService.IsPathInsideQuarantineDirectory(item.FullPath) && File.Exists(item.FullPath))
+                        {
+                            File.Delete(item.FullPath);
+                            count++;
+                        }
                     }
+                    catch { }
                 }
-                catch { }
-            }
+            });
+
             AddLog("WARN", $"[VAULT PURGED] Permanently deleted {count} quarantined files.");
             RefreshQuarantinedItems();
         }
