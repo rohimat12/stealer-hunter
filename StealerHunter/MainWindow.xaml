@@ -150,9 +150,9 @@
 
                                 <!-- Action Buttons -->
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
-                                    <Button Content="⚡ Quick Scan" Style="{StaticResource BtnPrimary}" Command="{Binding QuickScanCommand}" Margin="0,0,10,0" />
-                                    <Button Content="🔍 Deep Scan" Style="{StaticResource BtnSecondary}" Command="{Binding DeepScanCommand}" Margin="0,0,10,0" />
-                                    <Button Content="⏹ Stop" Style="{StaticResource BtnDanger}" Command="{Binding CancelScanCommand}" />
+                                    <Button Content="⚡ Quick Scan" Style="{StaticResource BtnPrimary}" Command="{Binding QuickScanCommand}" IsEnabled="{Binding CanStartScan}" Margin="0,0,10,0" />
+                                    <Button Content="🔍 Deep Scan" Style="{StaticResource BtnSecondary}" Command="{Binding DeepScanCommand}" IsEnabled="{Binding CanStartScan}" Margin="0,0,10,0" />
+                                    <Button Content="⏹ Stop" Style="{StaticResource BtnDanger}" Command="{Binding CancelScanCommand}" IsEnabled="{Binding IsScanning}" />
                                 </StackPanel>
                             </Grid>
                         </Border>

@@ -356,4 +356,33 @@ public class SecurityServicesTests
             if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true);
         }
     }
+
+    [TestMethod]
+    public void TestScanButtonStateManagement()
+    {
+        var vm = new StealerHunter.ViewModels.MainViewModel();
+
+        // Initially idle
+        Assert.IsFalse(vm.IsScanning, "IsScanning should be false initially");
+        Assert.IsTrue(vm.CanStartScan, "CanStartScan should be true when idle");
+        Assert.IsFalse(vm.CancelScanCommand.CanExecute(null), "Stop button should be disabled when idle");
+        Assert.IsTrue(vm.QuickScanCommand.CanExecute(null), "Quick Scan should be enabled when idle");
+        Assert.IsTrue(vm.DeepScanCommand.CanExecute(null), "Deep Scan should be enabled when idle");
+
+        // Simulate scan started
+        vm.IsScanning = true;
+        Assert.IsTrue(vm.IsScanning);
+        Assert.IsFalse(vm.CanStartScan, "CanStartScan should be false while scanning");
+        Assert.IsTrue(vm.CancelScanCommand.CanExecute(null), "Stop button should be enabled while scanning");
+        Assert.IsFalse(vm.QuickScanCommand.CanExecute(null), "Quick Scan should be disabled while scanning");
+        Assert.IsFalse(vm.DeepScanCommand.CanExecute(null), "Deep Scan should be disabled while scanning");
+
+        // Simulate scan finished / completed
+        vm.IsScanning = false;
+        Assert.IsFalse(vm.IsScanning);
+        Assert.IsTrue(vm.CanStartScan, "CanStartScan should be restored when scan completes");
+        Assert.IsFalse(vm.CancelScanCommand.CanExecute(null), "Stop button must be disabled when scan completes");
+        Assert.IsTrue(vm.QuickScanCommand.CanExecute(null), "Quick Scan should be re-enabled");
+        Assert.IsTrue(vm.DeepScanCommand.CanExecute(null), "Deep Scan should be re-enabled");
+    }
 }

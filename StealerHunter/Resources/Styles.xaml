@@ -101,7 +101,8 @@
                             <Setter Property="Opacity" Value="0.85" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Opacity" Value="0.35" />
+                            <Setter Property="Cursor" Value="No" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -130,6 +131,10 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter Property="Background" Value="#334155" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="No" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

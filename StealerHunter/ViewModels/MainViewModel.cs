@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
 using StealerHunter.Models;
 using StealerHunter.Services;
@@ -106,10 +107,31 @@ public class MainViewModel : INotifyPropertyChanged
 
     public event Action<string, string>? NotificationRequested;
 
+    public bool CanStartScan => !IsScanning;
+
     public bool IsScanning
     {
         get => _isScanning;
-        set { _isScanning = value; OnPropertyChanged(); }
+        set
+        {
+            if (_isScanning != value)
+            {
+                _isScanning = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanStartScan));
+                try
+                {
+                    System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                    {
+                        CommandManager.InvalidateRequerySuggested();
+                    });
+                }
+                catch
+                {
+                    // Dispatcher might not be active in unit tests
+                }
+            }
+        }
     }
 
     public double ScanProgress
