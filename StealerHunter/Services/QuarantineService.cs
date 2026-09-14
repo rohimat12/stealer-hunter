@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.IO;
+using System.Management;
 using StealerHunter.Models;
 
 namespace StealerHunter.Services;
@@ -128,18 +129,36 @@ public class QuarantineService
             // 2. Verify Process Start Time to prevent PID reuse by an identical process name
             if (expectedStartTime.HasValue)
             {
+                DateTime? actualStartTime = null;
                 try
                 {
-                    var actualStartTime = proc.StartTime;
-                    if (Math.Abs((actualStartTime - expectedStartTime.Value).TotalSeconds) > 2)
-                    {
-                        message = $"Target PID {pid} was reused by another instance of '{procName}' (Start time mismatch). Termination aborted for system safety.";
-                        return false;
-                    }
+                    actualStartTime = proc.StartTime;
                 }
                 catch
                 {
-                    // If access denied to StartTime on elevated/system process, skip StartTime check
+                    // Fallback to WMI if standard API access is restricted
+                    try
+                    {
+                        using var searcher = new ManagementObjectSearcher($"SELECT CreationDate FROM Win32_Process WHERE ProcessId = {pid}");
+                        using var objs = searcher.Get();
+                        foreach (var o in objs)
+                        {
+                            if (o["CreationDate"] is string dmtf && !string.IsNullOrEmpty(dmtf))
+                            {
+                                actualStartTime = ManagementDateTimeConverter.ToDateTime(dmtf);
+                                break;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (actualStartTime.HasValue && Math.Abs((actualStartTime.Value - expectedStartTime.Value).TotalSeconds) > 3)
+                {
+                    message = $"Target PID {pid} was reused by another instance of '{procName}' (Start time mismatch). Termination aborted for system safety.";
+                    return false;
                 }
             }
 

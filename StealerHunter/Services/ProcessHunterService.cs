@@ -62,6 +62,12 @@ public class ProcessHunterService
                 var cmdLine = wmiInfo?.CommandLine ?? string.Empty;
                 var ppid = wmiInfo?.ParentProcessId ?? 0;
 
+                // Fallback: if proc.StartTime was restricted/null, fallback to WMI CreationDate
+                if (!startTime.HasValue && wmiInfo?.CreationDate.HasValue == true)
+                {
+                    startTime = wmiInfo.CreationDate;
+                }
+
                 // 0. Check against Known Malware Database Signatures (Abuse.ch MalwareBazaar)
                 if (!string.IsNullOrEmpty(exePath) && dbService != null)
                 {
@@ -320,7 +326,7 @@ public class ProcessHunterService
         var result = new Dictionary<int, ProcessWmiInfo>();
         try
         {
-            using var searcher = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, Name, CommandLine FROM Win32_Process");
+            using var searcher = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, Name, CommandLine, CreationDate FROM Win32_Process");
             using var objects = searcher.Get();
 
             foreach (var obj in objects)
@@ -331,13 +337,26 @@ public class ProcessHunterService
                 int ppid = obj["ParentProcessId"] is uint pp ? (int)pp : 0;
                 string name = obj["Name"] as string ?? string.Empty;
                 string cmd = obj["CommandLine"] as string ?? string.Empty;
+                DateTime? creationDate = null;
+
+                if (obj["CreationDate"] is string dmtf && !string.IsNullOrEmpty(dmtf))
+                {
+                    try
+                    {
+                        creationDate = ManagementDateTimeConverter.ToDateTime(dmtf);
+                    }
+                    catch
+                    {
+                    }
+                }
 
                 result[pid] = new ProcessWmiInfo
                 {
                     ProcessId = pid,
                     ParentProcessId = ppid,
                     Name = name,
-                    CommandLine = cmd
+                    CommandLine = cmd,
+                    CreationDate = creationDate
                 };
             }
         }
@@ -356,4 +375,5 @@ public class ProcessWmiInfo
     public int ParentProcessId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string CommandLine { get; set; } = string.Empty;
+    public DateTime? CreationDate { get; set; }
 }
