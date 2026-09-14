@@ -54,6 +54,11 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
 7. **Emergency Security Checklist**:
    * Panduan langkah darurat pasca-infeksi: pencabutan sesi web aktif (*Revoke Google/Microsoft sessions*), pergantian password master email, aktivasi 2FA aplikasi, dan pengamanan aset digital.
 
+8. **Dual-Engine Threat Intelligence (Abuse.ch MalwareBazaar Integration)**:
+   * **1,230+ Hash Signatures**: Terintegrasi langsung dengan database signature ancaman global dari **Abuse.ch MalwareBazaar**.
+   * **Live Threat DB Updater**: Fitur pembaruan daring (*Live Update*) sekali klik untuk mengunduh intelijen malware teranyar dari server siber.
+   * **Memory & Directory Hash Matching**: Memvalidasi hash SHA-256 seluruh proses aktif dan direktori berisiko tinggi dengan pencarian instan O(1).
+
 ---
 
 ## 💻 Cara Menggunakan & Instalasi
@@ -104,9 +109,9 @@ stealer-hunter/
 ├── README.md                    # Dokumentasi proyek
 ├── StealerHunter/               # Proyek Aplikasi Utama (C# WPF .NET 8)
 │   ├── Models/                  # ThreatItem, BrowserTarget, ScanLogItem, AppSettings
-│   ├── Services/                # BrowserAudit, ProcessHunter, Persistence, Quarantine, AutoStartup, RealtimeWatcher, SystemTray
+│   ├── Services/                # BrowserAudit, ProcessHunter, Persistence, Quarantine, AutoStartup, RealtimeWatcher, SystemTray, MalwareDatabase
 │   ├── ViewModels/              # MainViewModel, RelayCommand, ValueConverters
-│   ├── Resources/               # Styles.xaml (Modern Cyber Dark Theme)
+│   ├── Resources/               # Styles.xaml (Modern Cyber Dark Theme), malware_db.json (Abuse.ch DB)
 │   ├── MainWindow.xaml/.cs      # Tampilan UI Dashboard & Tray Integration
 │   └── App.xaml/.cs             # Konfigurasi Aplikasi & Resource Dictionary
 └── StealerHunter.Tests/         # Proyek Unit Test (MSTest)

@@ -14,7 +14,8 @@ public enum ThreatCategory
     SuspiciousProcess,
     PersistenceAutorun,
     StagedExfiltrationData,
-    MaliciousScript
+    MaliciousScript,
+    KnownSignatureMatch
 }
 
 public class ThreatItem
@@ -46,6 +47,7 @@ public class ThreatItem
         ThreatCategory.PersistenceAutorun => "🔄",
         ThreatCategory.StagedExfiltrationData => "📦",
         ThreatCategory.MaliciousScript => "📜",
+        ThreatCategory.KnownSignatureMatch => "☣️",
         _ => "⚠️"
     };
 }

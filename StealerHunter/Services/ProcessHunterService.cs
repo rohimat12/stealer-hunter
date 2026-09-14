@@ -13,7 +13,7 @@ public class ProcessHunterService
         "winlogon.exe", "services.exe", "taskhostw.exe", "conhost.exe"
     };
 
-    public List<ThreatItem> ScanProcesses(Action<string, string>? logCallback = null)
+    public List<ThreatItem> ScanProcesses(Action<string, string>? logCallback = null, MalwareDatabaseService? dbService = null)
     {
         var threats = new List<ThreatItem>();
         var tempDir = Path.GetTempPath().TrimEnd('\\');
@@ -50,6 +50,27 @@ public class ProcessHunterService
                 var procName = proc.ProcessName;
                 commandLines.TryGetValue(proc.Id, out var cmdLine);
                 cmdLine ??= string.Empty;
+
+                // 0. Check against Known Malware Database Signatures (Abuse.ch MalwareBazaar)
+                if (!string.IsNullOrEmpty(exePath) && dbService != null)
+                {
+                    if (dbService.CheckFile(exePath, out var sig, out var sha256) && sig != null)
+                    {
+                        var threat = new ThreatItem
+                        {
+                            Name = $"Known Malware Process: {sig.Name}",
+                            Category = ThreatCategory.KnownSignatureMatch,
+                            Severity = ThreatSeverity.Critical,
+                            Description = $"Active process matches verified malware signature '{sig.Name}' ({sig.Type}). SHA256: {sha256}",
+                            FilePath = exePath,
+                            ProcessId = proc.Id,
+                            TargetTarget = "Malware Signature Match in Memory"
+                        };
+                        threats.Add(threat);
+                        logCallback?.Invoke("DANGER", $"[CRITICAL THREAT IN MEMORY] Process '{procName}' (PID {proc.Id}) matched signature '{sig.Name}'!");
+                        continue;
+                    }
+                }
 
                 // 1. Check for Masquerading System Processes & Resources directory abuse
                 if (!string.IsNullOrEmpty(exePath))

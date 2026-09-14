@@ -19,10 +19,12 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly RealtimeWatcherService _watcherService = new();
     private readonly MftDeepScanService _mftDeepScanService = new();
     private readonly ArchiveScannerService _archiveScanner = new();
+    private readonly MalwareDatabaseService _malwareDbService = new();
     private readonly AppSettings _settings;
 
     private CancellationTokenSource? _scanCts;
     private bool _isScanning;
+    private bool _isUpdatingDatabase;
     private double _scanProgress;
     private string _statusTitle = "SYSTEM SHIELD READY";
     private string _statusSubtitle = "Browser credentials protected. Ready to scan.";
@@ -53,6 +55,7 @@ public class MainViewModel : INotifyPropertyChanged
         OpenQuarantineFolderCommand = new RelayCommand(OpenQuarantineFolder);
         ClearLogsCommand = new RelayCommand(() => ScanLogs.Clear());
         DismissAlertCommand = new RelayCommand(() => HasActiveThreatAlert = false);
+        UpdateDatabaseCommand = new RelayCommand(async () => await UpdateDatabaseAsync(), () => !IsScanning && !IsUpdatingDatabase);
 
         _runOnStartup = AutoStartupService.IsAutoStartEnabled();
         _realtimeProtectionEnabled = _settings.RealtimeProtectionEnabled;
@@ -69,7 +72,7 @@ public class MainViewModel : INotifyPropertyChanged
         // Initialize detected browsers
         RefreshBrowsers();
 
-        AddLog("INFO", "StealerHunter initialized. Database signatures loaded.");
+        AddLog("INFO", $"StealerHunter initialized. Loaded {_malwareDbService.TotalSignatures:N0} Abuse.ch/MalwareBazaar threat signatures.");
         AddLog("INFO", $"Auto-Start on Boot is currently {(_runOnStartup ? "ENABLED" : "DISABLED")}.");
         AddLog("INFO", $"Realtime Protection is {(_realtimeProtectionEnabled ? "ACTIVE" : "INACTIVE")}.");
     }
@@ -86,6 +89,16 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand OpenQuarantineFolderCommand { get; }
     public ICommand ClearLogsCommand { get; }
     public ICommand DismissAlertCommand { get; }
+    public ICommand UpdateDatabaseCommand { get; }
+
+    public int MalwareDatabaseCount => _malwareDbService.TotalSignatures;
+    public string DatabaseStatusText => $"{_malwareDbService.TotalSignatures:N0} Signatures (Abuse.ch / MalwareBazaar)";
+
+    public bool IsUpdatingDatabase
+    {
+        get => _isUpdatingDatabase;
+        set { _isUpdatingDatabase = value; OnPropertyChanged(); }
+    }
 
     public event Action<string, string>? NotificationRequested;
 
@@ -294,11 +307,17 @@ public class MainViewModel : INotifyPropertyChanged
                 var browserThreats = _browserService.AuditBrowserIntegrity(DetectedBrowsers.ToList(), AddLog);
                 AddThreats(browserThreats);
 
-                // 2. Scan Running Processes
+                // 2. Scan Running Processes & Memory Hash Matching
                 ct.ThrowIfCancellationRequested();
-                UpdateScanStatus("Inspecting running processes in Temp, AppData, and memory...", 45);
-                var processThreats = _processService.ScanProcesses(AddLog);
+                UpdateScanStatus("Inspecting running processes in Temp, AppData, and memory...", 35);
+                var processThreats = _processService.ScanProcesses(AddLog, _malwareDbService);
                 AddThreats(processThreats);
+
+                // 2b. Scan Critical System Folders against MalwareBazaar Database
+                ct.ThrowIfCancellationRequested();
+                UpdateScanStatus($"Matching file hashes against {_malwareDbService.TotalSignatures:N0} MalwareBazaar signatures...", 50);
+                var signatureThreats = _malwareDbService.ScanCriticalDirectories(AddLog, (msg, pct) => UpdateScanStatus(msg, pct), ct);
+                AddThreats(signatureThreats);
 
                 // 3. Scan Persistence & Startup
                 ct.ThrowIfCancellationRequested();
@@ -513,6 +532,28 @@ public class MainViewModel : INotifyPropertyChanged
                 ScanLogs.RemoveAt(ScanLogs.Count - 1);
             }
         });
+    }
+
+    public async Task UpdateDatabaseAsync()
+    {
+        if (IsUpdatingDatabase) return;
+        IsUpdatingDatabase = true;
+        try
+        {
+            AddLog("INFO", "Connecting to Abuse.ch MalwareBazaar threat intelligence feed...");
+            var (added, total) = await _malwareDbService.UpdateFromMalwareBazaarAsync(AddLog);
+            OnPropertyChanged(nameof(MalwareDatabaseCount));
+            OnPropertyChanged(nameof(DatabaseStatusText));
+            NotificationRequested?.Invoke("Database Updated", $"Malware database updated! Added +{added:N0} signatures. Total active: {total:N0}.");
+        }
+        catch (Exception ex)
+        {
+            AddLog("WARN", $"Database update failed: {ex.Message}");
+        }
+        finally
+        {
+            IsUpdatingDatabase = false;
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

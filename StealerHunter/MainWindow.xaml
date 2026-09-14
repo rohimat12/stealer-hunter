@@ -65,7 +65,14 @@
 
                 <!-- Status Badge Right -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#131B2E" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="20" Padding="12,6" Margin="0,0,12,0">
+                    <Border Background="#131B2E" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="20" Padding="12,6" Margin="0,0,10,0" ToolTip="Database Signature Malware (Abuse.ch MalwareBazaar)">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="☣️" FontSize="11" Margin="0,0,6,0" />
+                            <TextBlock Text="{Binding DatabaseStatusText}" Foreground="{StaticResource BrushCyan}" FontSize="11" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                    <Button Content="🔄 Update DB" Style="{StaticResource BtnSecondary}" Command="{Binding UpdateDatabaseCommand}" Padding="10,5" FontSize="11" Height="28" Margin="0,0,10,0" ToolTip="Unduh signature malware terbaru secara live dari Abuse.ch MalwareBazaar" />
+                    <Border Background="#131B2E" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="20" Padding="12,6">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Ellipse Width="8" Height="8" Fill="{StaticResource BrushEmerald}" Margin="0,0,8,0" />
                             <TextBlock Text="GUARD ACTIVE" Foreground="{StaticResource BrushTextPrimary}" FontSize="11" FontWeight="SemiBold" />
