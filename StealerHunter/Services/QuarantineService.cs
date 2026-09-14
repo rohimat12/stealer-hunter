@@ -23,6 +23,63 @@ public class QuarantineService
 
     public static string GetQuarantineDirectory() => QuarantineDir;
 
+    public static List<QuarantinedItem> GetQuarantinedItems()
+    {
+        EnsureQuarantineDirectory();
+        var list = new List<QuarantinedItem>();
+        if (!Directory.Exists(QuarantineDir)) return list;
+
+        var files = Directory.GetFiles(QuarantineDir, "*.quarantined");
+        foreach (var file in files)
+        {
+            try
+            {
+                var fi = new FileInfo(file);
+                var qName = fi.Name;
+                var origName = ExtractOriginalFileName(qName);
+                list.Add(new QuarantinedItem
+                {
+                    FullPath = fi.FullName,
+                    QuarantinedFileName = qName,
+                    OriginalFileName = origName,
+                    FileSizeBytes = fi.Length,
+                    QuarantinedDate = fi.CreationTime > fi.LastWriteTime ? fi.CreationTime : fi.LastWriteTime
+                });
+            }
+            catch { }
+        }
+        return list.OrderByDescending(x => x.QuarantinedDate).ToList();
+    }
+
+    public static string ExtractOriginalFileName(string fileName)
+    {
+        var name = Path.GetFileName(fileName);
+        if (name.EndsWith(".quarantined", StringComparison.OrdinalIgnoreCase))
+        {
+            name = name[..^12];
+        }
+
+        // Pattern 1: yyyyMMdd_HHmmss_token_originalName
+        var parts = name.Split('_', 3);
+        if (parts.Length == 3 && parts[0].Length == 8 && parts[1].Length == 6)
+        {
+            var tokenAndName = parts[2].Split('_', 2);
+            if (tokenAndName.Length == 2)
+            {
+                return tokenAndName[1];
+            }
+        }
+
+        // Pattern 2: originalName_yyyyMMddHHmmss
+        var lastUnderscore = name.LastIndexOf('_');
+        if (lastUnderscore > 0 && name.Length - lastUnderscore - 1 == 14)
+        {
+            return name[..lastUnderscore];
+        }
+
+        return name;
+    }
+
     public static bool IsProtectedBrowserCredentialFile(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;

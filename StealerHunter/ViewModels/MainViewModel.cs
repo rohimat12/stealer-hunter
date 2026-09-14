@@ -55,9 +55,15 @@ public class MainViewModel : INotifyPropertyChanged
         NeutralizeThreatCommand = new RelayCommand(p => NeutralizeSingleThreat(p as ThreatItem));
         RestoreThreatCommand = new RelayCommand(p => RestoreSingleThreat(p as ThreatItem));
         OpenQuarantineFolderCommand = new RelayCommand(OpenQuarantineFolder);
+        RefreshQuarantineCommand = new RelayCommand(RefreshQuarantinedItems);
+        RestoreVaultItemCommand = new RelayCommand(p => RestoreVaultItem(p as QuarantinedItem));
+        DeleteVaultItemCommand = new RelayCommand(p => DeleteVaultItem(p as QuarantinedItem));
+        EmptyVaultCommand = new RelayCommand(EmptyVault, () => QuarantinedItems.Any());
         ClearLogsCommand = new RelayCommand(() => ScanLogs.Clear());
         DismissAlertCommand = new RelayCommand(() => HasActiveThreatAlert = false);
         UpdateDatabaseCommand = new RelayCommand(async () => await UpdateDatabaseAsync(), () => !IsScanning && !IsUpdatingDatabase);
+
+        RefreshQuarantinedItems();
 
         _runOnStartup = AutoStartupService.IsAutoStartEnabled();
         _realtimeProtectionEnabled = _settings.RealtimeProtectionEnabled;
@@ -84,6 +90,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<ThreatItem> DetectedThreats { get; }
     public ObservableCollection<BrowserTarget> DetectedBrowsers { get; }
     public ObservableCollection<ScanLogItem> ScanLogs { get; }
+    public ObservableCollection<QuarantinedItem> QuarantinedItems { get; } = new();
 
     public ICommand QuickScanCommand { get; }
     public ICommand DeepScanCommand { get; }
@@ -92,9 +99,15 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand NeutralizeThreatCommand { get; }
     public ICommand RestoreThreatCommand { get; }
     public ICommand OpenQuarantineFolderCommand { get; }
+    public ICommand RefreshQuarantineCommand { get; }
+    public ICommand RestoreVaultItemCommand { get; }
+    public ICommand DeleteVaultItemCommand { get; }
+    public ICommand EmptyVaultCommand { get; }
     public ICommand ClearLogsCommand { get; }
     public ICommand DismissAlertCommand { get; }
     public ICommand UpdateDatabaseCommand { get; }
+
+    public int QuarantinedCount => QuarantinedItems.Count;
 
     public int MalwareDatabaseCount => _malwareDbService.TotalSignatures;
     public string DatabaseStatusText => $"{_malwareDbService.TotalSignatures:N0} Signatures (Abuse.ch / MalwareBazaar)";
@@ -532,6 +545,7 @@ public class MainViewModel : INotifyPropertyChanged
 
         OnPropertyChanged(nameof(ThreatsCount));
         OnPropertyChanged(nameof(ResolvedCount));
+        RefreshQuarantinedItems();
 
         if (DetectedThreats.All(t => t.IsResolved))
         {
@@ -583,6 +597,7 @@ public class MainViewModel : INotifyPropertyChanged
 
         OnPropertyChanged(nameof(ThreatsCount));
         OnPropertyChanged(nameof(ResolvedCount));
+        RefreshQuarantinedItems();
     }
 
     public void RestoreSingleThreat(ThreatItem? threat)
@@ -614,6 +629,132 @@ public class MainViewModel : INotifyPropertyChanged
 
         OnPropertyChanged(nameof(ThreatsCount));
         OnPropertyChanged(nameof(ResolvedCount));
+        RefreshQuarantinedItems();
+    }
+
+    public void RefreshQuarantinedItems()
+    {
+        try
+        {
+            var items = QuarantineService.GetQuarantinedItems();
+            QuarantinedItems.Clear();
+            foreach (var item in items)
+            {
+                QuarantinedItems.Add(item);
+            }
+            OnPropertyChanged(nameof(QuarantinedCount));
+            ((RelayCommand)EmptyVaultCommand)?.RaiseCanExecuteChanged();
+        }
+        catch (Exception ex)
+        {
+            AddLog("WARN", $"Could not refresh quarantine vault: {ex.Message}");
+        }
+    }
+
+    public void RestoreVaultItem(QuarantinedItem? item)
+    {
+        if (item == null || !File.Exists(item.FullPath)) return;
+
+        var confirm = System.Windows.MessageBox.Show(
+            $"Are you sure you want to restore this file from quarantine?\n\n" +
+            $"File: {item.OriginalFileName}\nSize: {item.FormattedSize}\nDate: {item.FormattedDate}\n\n" +
+            "WARNING: If this file was a true malicious payload, restoring it will decrypt the executable back onto your system.",
+            "Confirm Quarantine Restoration",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+
+        if (confirm != System.Windows.MessageBoxResult.Yes) return;
+
+        var sfd = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Select Destination for Restored File",
+            FileName = item.OriginalFileName,
+            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+            Filter = "All Files (*.*)|*.*"
+        };
+
+        if (sfd.ShowDialog() == true)
+        {
+            bool success = QuarantineService.RestoreQuarantinedFile(item.FullPath, sfd.FileName, out var msg);
+            if (success)
+            {
+                AddLog("SUCCESS", $"[VAULT RESTORE] {item.OriginalFileName} restored to: {sfd.FileName}");
+                var deleteQuarantine = System.Windows.MessageBox.Show(
+                    $"File successfully restored to:\n{sfd.FileName}\n\nDo you want to delete the quarantined copy from the vault?",
+                    "Restore Succeeded",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Question);
+
+                if (deleteQuarantine == System.Windows.MessageBoxResult.Yes)
+                {
+                    try { File.Delete(item.FullPath); } catch { }
+                }
+                RefreshQuarantinedItems();
+            }
+            else
+            {
+                System.Windows.MessageBox.Show($"Failed to restore file:\n{msg}", "Restore Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                AddLog("DANGER", $"[VAULT RESTORE FAILED] {msg}");
+            }
+        }
+    }
+
+    public void DeleteVaultItem(QuarantinedItem? item)
+    {
+        if (item == null || !File.Exists(item.FullPath)) return;
+
+        var confirm = System.Windows.MessageBox.Show(
+            $"Permanently delete this quarantined file?\n\n" +
+            $"File: {item.OriginalFileName}\nSize: {item.FormattedSize}\n\n" +
+            "This action cannot be undone.",
+            "Confirm Permanent Deletion",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+
+        if (confirm == System.Windows.MessageBoxResult.Yes)
+        {
+            try
+            {
+                File.Delete(item.FullPath);
+                AddLog("WARN", $"[VAULT DELETED] Permanently removed: {item.OriginalFileName}");
+                RefreshQuarantinedItems();
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to delete file: {ex.Message}", "Delete Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
+    }
+
+    public void EmptyVault()
+    {
+        if (!QuarantinedItems.Any()) return;
+
+        var confirm = System.Windows.MessageBox.Show(
+            $"Permanently delete ALL {QuarantinedItems.Count} quarantined files?\n\n" +
+            "This will purge the entire quarantine vault. This action cannot be undone.",
+            "Confirm Empty Quarantine Vault",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+
+        if (confirm == System.Windows.MessageBoxResult.Yes)
+        {
+            int count = 0;
+            foreach (var item in QuarantinedItems.ToList())
+            {
+                try
+                {
+                    if (File.Exists(item.FullPath))
+                    {
+                        File.Delete(item.FullPath);
+                        count++;
+                    }
+                }
+                catch { }
+            }
+            AddLog("WARN", $"[VAULT PURGED] Permanently deleted {count} quarantined files.");
+            RefreshQuarantinedItems();
+        }
     }
 
     private void OpenQuarantineFolder()

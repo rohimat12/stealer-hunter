@@ -3,7 +3,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://microsoft.com)
 [![Framework](https://img.shields.io/badge/Framework-.NET%208%20WPF-purple.svg)](https://dotnet.microsoft.com/)
 [![Version](https://img.shields.io/badge/Version-v1.1.0-cyan.svg)](#)
-[![Tests](https://img.shields.io/badge/Tests-19%2F19%20Passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/Tests-20%2F20%20Passing-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Focus-Anti--Infostealer-red.svg)](#)
 [![Built With](https://img.shields.io/badge/Built%20With-AI%20Pair%20Programming-brightgreen.svg)](#)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#)
@@ -133,6 +133,9 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
 11. **Real-Time Progress Percentage & State Guard**:
     * Indikator persentase pemindaian real-time (0% s/d 100%) dengan sinkronisasi status tombol otomatis (tombol Stop hanya aktif saat scan berlangsung, tombol Quick & Deep scan terkunci untuk mencegah pemindaian ganda).
 
+12. **Interactive Encrypted Quarantine Vault UI**:
+    * Layar khusus (*Tab Quarantine Vault*) untuk memeriksa seluruh berkas terisolasi di `%APPDATA%\StealerHunter\Quarantine`. Menampilkan nama file asli, ukuran berkas, tanggal isolasi, tombol **Restore** aman (dengan dialog pemilihan lokasi tujuan), serta tombol **Hapus Permanen** per-file maupun pengosongan brankas (*Empty Vault*).
+
 ---
 
 ## 🖥️ Persyaratan & Rekomendasi Sistem
@@ -178,11 +181,11 @@ BUILD_INSTALLER.bat
 ---
 
 ## 🧪 Pengujian Unit (Unit Tests)
-Proyek ini dilengkapi pengujian otomatis yang komprehensif (MSTest) mencakup deteksi browser, validasi hash, pemburu proses, mitigasi overwrite, keamanan karantina, autorun ground-truth, hingga state UI:
+Proyek ini dilengkapi pengujian otomatis yang komprehensif (MSTest) mencakup deteksi browser, validasi hash, pemburu proses, mitigasi overwrite, keamanan karantina, autorun ground-truth, parsing brankas karantina, hingga sinkronisasi state UI:
 ```powershell
 dotnet test
 ```
-*Seluruh pengujian unit (**19/19**) terverifikasi lolos hijau (100% Passed).*
+*Seluruh pengujian unit (**20/20**) terverifikasi lolos hijau (100% Passed).*
 
 ---
 
@@ -196,7 +199,7 @@ stealer-hunter/
 ├── BUILD_INSTALLER.bat          # Otomasi kompilasi installer standalone
 ├── README.md                    # Dokumentasi proyek
 ├── StealerHunter/               # Proyek Aplikasi Utama (C# WPF .NET 8)
-│   ├── Models/                  # ThreatItem, BrowserTarget, ScanLogItem, AppSettings
+│   ├── Models/                  # ThreatItem, BrowserTarget, ScanLogItem, AppSettings, QuarantinedItem
 │   ├── Services/                # BrowserAudit, ProcessHunter, Persistence, Quarantine, AutoStartup,
 │   │                            # RealtimeWatcher, SystemTray, MalwareDatabase, MftDeepScanService,
 │   │                            # ArchiveScannerService, StagedDataHunter
@@ -204,7 +207,7 @@ stealer-hunter/
 │   ├── Resources/               # Styles.xaml (Modern Cyber Dark Theme), malware_db.json (Abuse.ch DB)
 │   ├── MainWindow.xaml/.cs      # Tampilan UI Dashboard & Tray Integration
 │   └── App.xaml/.cs             # Konfigurasi Aplikasi & Resource Dictionary
-└── StealerHunter.Tests/         # Proyek Unit Test (MSTest - 19 Pengujian Otomatis)
+└── StealerHunter.Tests/         # Proyek Unit Test (MSTest - 20 Pengujian Otomatis)
 ```
 
 ---

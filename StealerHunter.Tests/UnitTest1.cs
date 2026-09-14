@@ -409,4 +409,26 @@ public class SecurityServicesTests
         // When scan completes and progress is at 100%
         Assert.AreEqual("100%", vm.ScanProgressText, "Completed scan at 100% should show 100%");
     }
+
+    [TestMethod]
+    public void TestQuarantineVaultItemParsingAndListing()
+    {
+        // 1. Verify filename extraction patterns
+        var pattern1 = "20260915_053000_a1b2c3d4_payload.exe.quarantined";
+        Assert.AreEqual("payload.exe", QuarantineService.ExtractOriginalFileName(pattern1));
+
+        var pattern2 = "malware.exe_20260915053000.quarantined";
+        Assert.AreEqual("malware.exe", QuarantineService.ExtractOriginalFileName(pattern2));
+
+        var pattern3 = "simple_virus.dll.quarantined";
+        Assert.AreEqual("simple_virus.dll", QuarantineService.ExtractOriginalFileName(pattern3));
+
+        // 2. Verify ViewModel integration
+        var vm = new StealerHunter.ViewModels.MainViewModel();
+        Assert.IsNotNull(vm.QuarantinedItems);
+        Assert.IsNotNull(vm.RefreshQuarantineCommand);
+        Assert.IsNotNull(vm.RestoreVaultItemCommand);
+        Assert.IsNotNull(vm.DeleteVaultItemCommand);
+        Assert.IsNotNull(vm.EmptyVaultCommand);
+    }
 }
