@@ -27,6 +27,7 @@ public class RealtimeWatcherService : IDisposable
                 };
 
                 _tempWatcher.Created += OnTempItemCreated;
+                _tempWatcher.Renamed += OnTempItemRenamed;
                 _tempWatcher.Error += OnWatcherError;
             }
 
@@ -48,6 +49,7 @@ public class RealtimeWatcherService : IDisposable
             {
                 _tempWatcher.EnableRaisingEvents = false;
                 _tempWatcher.Created -= OnTempItemCreated;
+                _tempWatcher.Renamed -= OnTempItemRenamed;
                 _tempWatcher.Error -= OnWatcherError;
                 _tempWatcher.Dispose();
                 _tempWatcher = null;
@@ -65,13 +67,32 @@ public class RealtimeWatcherService : IDisposable
     {
         var ex = e.GetException();
         WatcherLog?.Invoke("WARN", $"Realtime %TEMP% watcher handled I/O surge: {ex?.Message ?? "Internal buffer surge recovered."}");
+
+        // Auto-recover event monitoring on buffer surge
+        try
+        {
+            if (_tempWatcher != null)
+            {
+                _tempWatcher.EnableRaisingEvents = false;
+                _tempWatcher.EnableRaisingEvents = true;
+            }
+        }
+        catch
+        {
+        }
     }
 
-    private void OnTempItemCreated(object sender, FileSystemEventArgs e)
+    private void OnTempItemCreated(object sender, FileSystemEventArgs e) =>
+        InspectItem(e.FullPath, e.Name, "created");
+
+    private void OnTempItemRenamed(object sender, RenamedEventArgs e) =>
+        InspectItem(e.FullPath, e.Name, "renamed");
+
+    private void InspectItem(string fullPath, string? rawName, string action)
     {
         try
         {
-            var name = e.Name?.ToLowerInvariant() ?? string.Empty;
+            var name = rawName?.ToLowerInvariant() ?? string.Empty;
             if (string.IsNullOrEmpty(name)) return;
 
             // Skip PyInstaller / Python runtime temporary extractions (e.g. _MEIxxxxx\base_library.zip)
@@ -99,23 +120,23 @@ public class RealtimeWatcherService : IDisposable
             if (isStealerText || isStealerArchive || isExecutableScript)
             {
                 SuspiciousActivityDetected?.Invoke(
-                    $"Suspicious file creation in Temp folder: '{e.Name}'",
-                    e.FullPath
+                    $"Suspicious file {action} in Temp folder: '{rawName}'",
+                    fullPath
                 );
                 return;
             }
 
             // High-entropy encrypted credential staging detection (Lumma, Stealc mutation)
-            if (File.Exists(e.FullPath))
+            if (File.Exists(fullPath))
             {
                 var ext = Path.GetExtension(name);
-                if (ext is ".txt" or ".tmp" or ".dat" or ".log" or ".bin")
+                if (ext is ".txt" or ".tmp" or ".dat" or ".log")
                 {
-                    if (EntropyHelper.IsSuspiciousHighEntropyStaging(e.FullPath, out var entropy))
+                    if (EntropyHelper.IsSuspiciousHighEntropyStaging(fullPath, out var entropy))
                     {
                         SuspiciousActivityDetected?.Invoke(
-                            $"Encrypted/Obfuscated Staging Dump: '{e.Name}' (Shannon Entropy: {entropy:F2}/8.00)",
-                            e.FullPath
+                            $"Encrypted/Obfuscated Staging Dump: '{rawName}' (Shannon Entropy: {entropy:F2}/8.00)",
+                            fullPath
                         );
                     }
                 }

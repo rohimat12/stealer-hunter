@@ -255,7 +255,7 @@ public class MftDeepScanService
                 {
                     IntPtr recordPtr = IntPtr.Add(outBuffer, offset);
                     int recordLength = Marshal.ReadInt32(recordPtr);
-                    if (recordLength <= 0) break;
+                    if (recordLength < 60 || offset + recordLength > bytesReturned) break;
 
                     short majorVersion = Marshal.ReadInt16(recordPtr, 4);
                     ulong frn;
@@ -284,6 +284,12 @@ public class MftDeepScanService
                         fileNameOffset = Marshal.ReadInt16(recordPtr, 66);
                     }
                     else
+                    {
+                        offset += recordLength;
+                        continue;
+                    }
+
+                    if (fileNameOffset < 56 || fileNameLength <= 0 || fileNameOffset + fileNameLength > recordLength)
                     {
                         offset += recordLength;
                         continue;

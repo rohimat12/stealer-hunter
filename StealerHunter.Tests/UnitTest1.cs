@@ -304,4 +304,27 @@ public class SecurityServicesTests
         Assert.IsTrue(msg.Contains("start time mismatch", StringComparison.OrdinalIgnoreCase) || msg.Contains("Termination aborted"),
             $"Message should explain abort due to start time mismatch: {msg}");
     }
+
+    [TestMethod]
+    public void TestSystemCriticalPathSafeguard()
+    {
+        var winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        var sys32 = Environment.GetFolderPath(Environment.SpecialFolder.System);
+
+        Assert.IsTrue(QuarantineService.IsSystemCriticalPath(Path.Combine(sys32, "svchost.exe")), "System32 must be critical");
+        Assert.IsTrue(QuarantineService.IsSystemCriticalPath(Path.Combine(winDir, "explorer.exe")), "Windows root must be critical");
+        Assert.IsFalse(QuarantineService.IsSystemCriticalPath(Path.Combine(Path.GetTempPath(), "evil.exe")), "Temp path must not be critical");
+    }
+
+    [TestMethod]
+    public void TestProtectedBrowserCredentialFiles()
+    {
+        var chromeLoginData = @"C:\Users\test\AppData\Local\Google\Chrome\User Data\Default\Login Data";
+        var edgeCookies = @"C:\Users\test\AppData\Local\Microsoft\Edge\User Data\Default\Network\Cookies";
+        var randomFile = @"C:\Users\test\AppData\Local\Temp\random.txt";
+
+        Assert.IsTrue(QuarantineService.IsProtectedBrowserCredentialFile(chromeLoginData), "Login Data must be immune");
+        Assert.IsTrue(QuarantineService.IsProtectedBrowserCredentialFile(edgeCookies), "Cookies must be immune");
+        Assert.IsFalse(QuarantineService.IsProtectedBrowserCredentialFile(randomFile), "Temp random file must not be immune");
+    }
 }

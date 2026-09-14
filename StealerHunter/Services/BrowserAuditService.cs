@@ -152,8 +152,7 @@ public class BrowserAuditService
                 if (IsFileLockedExclusively(filePath, out var isLocked) && isLocked)
                 {
                     // If browser itself is not running, but its database is locked, it's highly suspicious
-                    var processName = GetProcessBaseName(browser.BrowserName);
-                    var isBrowserRunning = System.Diagnostics.Process.GetProcessesByName(processName).Length > 0;
+                    var isBrowserRunning = IsBrowserProcessRunning(browser.BrowserName);
 
                     if (!isBrowserRunning)
                     {
@@ -196,15 +195,21 @@ public class BrowserAuditService
         }
     }
 
-    private static string GetProcessBaseName(string browserName)
+    private static bool IsBrowserProcessRunning(string browserName)
     {
-        if (browserName.Contains("Chrome")) return "chrome";
-        if (browserName.Contains("Edge")) return "msedge";
-        if (browserName.Contains("Brave")) return "brave";
-        if (browserName.Contains("Firefox")) return "firefox";
-        if (browserName.Contains("Opera GX")) return "opera";
-        if (browserName.Contains("Opera")) return "opera";
-        if (browserName.Contains("Vivaldi")) return "vivaldi";
-        return string.Empty;
+        var candidates = GetProcessCandidates(browserName);
+        return candidates.Any(cand => !string.IsNullOrEmpty(cand) && System.Diagnostics.Process.GetProcessesByName(cand).Length > 0);
+    }
+
+    private static string[] GetProcessCandidates(string browserName)
+    {
+        if (browserName.Contains("Chrome", StringComparison.OrdinalIgnoreCase)) return new[] { "chrome" };
+        if (browserName.Contains("Edge", StringComparison.OrdinalIgnoreCase)) return new[] { "msedge" };
+        if (browserName.Contains("Brave", StringComparison.OrdinalIgnoreCase)) return new[] { "brave" };
+        if (browserName.Contains("Firefox", StringComparison.OrdinalIgnoreCase)) return new[] { "firefox" };
+        if (browserName.Contains("Opera GX", StringComparison.OrdinalIgnoreCase)) return new[] { "opera", "opera_gx", "operagx" };
+        if (browserName.Contains("Opera", StringComparison.OrdinalIgnoreCase)) return new[] { "opera" };
+        if (browserName.Contains("Vivaldi", StringComparison.OrdinalIgnoreCase)) return new[] { "vivaldi" };
+        return Array.Empty<string>();
     }
 }

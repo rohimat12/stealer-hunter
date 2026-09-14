@@ -44,7 +44,6 @@ public class AutoStartupService
 
     public static bool SetAutoStart(bool enable)
     {
-        bool success = false;
         try
         {
             var exePath = Environment.ProcessPath;
@@ -66,8 +65,7 @@ public class AutoStartupService
                         UseShellExecute = false
                     };
                     using var proc = Process.Start(psi);
-                    proc?.WaitForExit(3000);
-                    if (proc != null && proc.ExitCode == 0) success = true;
+                    if (proc != null) proc.WaitForExit(3000);
                 }
                 catch { }
 
@@ -75,11 +73,7 @@ public class AutoStartupService
                 try
                 {
                     using var key = Registry.CurrentUser.OpenSubKey(RunRegistryKey, true);
-                    if (key != null)
-                    {
-                        key.SetValue(AppName, $"\"{exePath}\" --silent");
-                        success = true;
-                    }
+                    key?.SetValue(AppName, $"\"{exePath}\" --silent");
                 }
                 catch { }
             }
@@ -93,11 +87,12 @@ public class AutoStartupService
                         FileName = "schtasks.exe",
                         Arguments = $"/Delete /TN \"{TaskName}\" /F",
                         CreateNoWindow = true,
-                        UseShellExecute = false
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
                     };
                     using var proc = Process.Start(psi);
                     proc?.WaitForExit(3000);
-                    success = true;
                 }
                 catch { }
 
@@ -108,7 +103,6 @@ public class AutoStartupService
                     if (key?.GetValue(AppName) != null)
                     {
                         key.DeleteValue(AppName, false);
-                        success = true;
                     }
                 }
                 catch { }
@@ -119,6 +113,8 @@ public class AutoStartupService
             // Logging or permission handling
         }
 
-        return success;
+        // Final verification: ensure actual ground truth matches requested state
+        bool isCurrentlyEnabled = IsAutoStartEnabled();
+        return enable ? isCurrentlyEnabled : !isCurrentlyEnabled;
     }
 }

@@ -394,20 +394,40 @@ public class QuarantineService
         }
     }
 
+    public static bool IsSystemCriticalPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return true;
+        var winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows).TrimEnd('\\');
+        var system32 = Environment.GetFolderPath(Environment.SpecialFolder.System).TrimEnd('\\');
+
+        if (path.StartsWith(system32, StringComparison.OrdinalIgnoreCase)) return true;
+
+        if (path.StartsWith(winDir, StringComparison.OrdinalIgnoreCase))
+        {
+            var resources = Path.Combine(winDir, "Resources");
+            if (!path.StartsWith(resources, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static bool RemoveRegistryAutorun(string formattedKey, out string message)
     {
         try
         {
             // Expected format: "HKCU\Software\... -> ValueName" or "HKLM\WOW6432Node\Software\... -> ValueName"
-            var parts = formattedKey.Split("->");
-            if (parts.Length != 2)
+            var arrowIndex = formattedKey.IndexOf("->", StringComparison.Ordinal);
+            if (arrowIndex < 0)
             {
                 message = "Invalid registry format";
                 return false;
             }
 
-            var fullPath = parts[0].Trim();
-            var valueName = parts[1].Trim();
+            var fullPath = formattedKey.Substring(0, arrowIndex).Trim();
+            var valueName = formattedKey.Substring(arrowIndex + 2).Trim();
 
             bool isCurrentUser = fullPath.StartsWith("HKCU", StringComparison.OrdinalIgnoreCase);
             var hive = isCurrentUser ? RegistryHive.CurrentUser : RegistryHive.LocalMachine;
@@ -416,7 +436,14 @@ public class QuarantineService
             var view = isWow64 ? RegistryView.Registry32 : RegistryView.Registry64;
 
             // Extract the subkey relative to hive
-            var subPath = fullPath.Substring(fullPath.IndexOf('\\') + 1);
+            var slashIdx = fullPath.IndexOf('\\');
+            if (slashIdx < 0)
+            {
+                message = "Invalid registry subpath";
+                return false;
+            }
+
+            var subPath = fullPath.Substring(slashIdx + 1);
             if (subPath.StartsWith("WOW6432Node\\", StringComparison.OrdinalIgnoreCase))
             {
                 subPath = subPath.Substring("WOW6432Node\\".Length);
@@ -430,15 +457,33 @@ public class QuarantineService
                 key.DeleteValue(valueName, false);
                 message = $"Removed autorun value '{valueName}' from {fullPath}";
 
-                // Also quarantine the physical file pointed to by this autorun value
+                // Also quarantine the physical file pointed to by this autorun value IF unsafe
                 if (!string.IsNullOrEmpty(rawVal))
                 {
                     string targetFile = PersistenceService.ExtractFilePath(rawVal);
                     if (!string.IsNullOrEmpty(targetFile) && File.Exists(targetFile))
                     {
-                        if (QuarantineFile(targetFile, out var fileMsg))
+                        // Safeguard #1: Never quarantine browser credential databases
+                        if (IsProtectedBrowserCredentialFile(targetFile))
                         {
-                            message += $" and {fileMsg}";
+                            message += $" (Preserved browser database '{Path.GetFileName(targetFile)}')";
+                        }
+                        // Safeguard #2: Never quarantine critical system files
+                        else if (IsSystemCriticalPath(targetFile))
+                        {
+                            message += $" (Preserved critical system file '{Path.GetFileName(targetFile)}')";
+                        }
+                        // Safeguard #3: Never quarantine verified signed vendor binaries
+                        else if (DigitalSignatureHelper.IsTrustedOrSigned(targetFile, out var signerInfo))
+                        {
+                            message += $" (Preserved verified signed binary '{Path.GetFileName(targetFile)}' [{signerInfo}])";
+                        }
+                        else
+                        {
+                            if (QuarantineFile(targetFile, out var fileMsg))
+                            {
+                                message += $" and {fileMsg}";
+                            }
                         }
                     }
                 }

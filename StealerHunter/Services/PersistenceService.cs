@@ -53,17 +53,31 @@ public class PersistenceService
                     var ext = Path.GetExtension(file).ToLowerInvariant();
                     if (ext is ".exe" or ".vbs" or ".bat" or ".cmd" or ".ps1" or ".js")
                     {
+                        var fileName = Path.GetFileName(file);
+                        bool isSigned = false;
+                        string? signer = null;
+
+                        if (ext == ".exe")
+                        {
+                            isSigned = DigitalSignatureHelper.IsTrustedOrSigned(file, out signer);
+                            if (isSigned)
+                            {
+                                logCallback?.Invoke("INFO", $"[WHITELIST] Legitimate signed program in Startup: {fileName} ({signer})");
+                                continue;
+                            }
+                        }
+
                         var threat = new ThreatItem
                         {
-                            Name = $"Rogue Startup File: {Path.GetFileName(file)}",
+                            Name = $"Unsigned Startup Program: {fileName}",
                             Category = ThreatCategory.PersistenceAutorun,
-                            Severity = ThreatSeverity.High,
-                            Description = $"Executable or script found directly inside Windows Startup folder: '{file}'",
+                            Severity = (ext is ".vbs" or ".ps1" or ".js") ? ThreatSeverity.High : ThreatSeverity.Medium,
+                            Description = $"Unverified executable or script configured to launch on Windows startup: '{file}' (Signer: {signer ?? "None"})",
                             FilePath = file,
                             TargetTarget = "Windows Auto-Startup Folder"
                         };
                         threats.Add(threat);
-                        logCallback?.Invoke("WARN", $"[HIGH] Startup folder item detected: {file}");
+                        logCallback?.Invoke("WARN", $"[STARTUP] Unsigned startup entry detected: {file}");
                     }
                 }
             }

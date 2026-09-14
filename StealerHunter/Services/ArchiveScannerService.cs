@@ -249,6 +249,21 @@ public class ArchiveScannerService
     private static List<string> ReadArchiveEntries(string archivePath)
     {
         var entries = new List<string>();
+        try
+        {
+            var fileInfo = new FileInfo(archivePath);
+            // Safeguard: skip archives larger than 100MB to avoid high memory usage / zip bombs
+            if (fileInfo.Length > 100 * 1024 * 1024)
+            {
+                return entries;
+            }
+        }
+        catch
+        {
+            return entries;
+        }
+
+        const int maxEntries = 5000;
         var ext = Path.GetExtension(archivePath).ToLowerInvariant();
 
         // Native Fast ZIP reading
@@ -259,6 +274,7 @@ public class ArchiveScannerService
                 using var zip = ZipFile.OpenRead(archivePath);
                 foreach (var entry in zip.Entries)
                 {
+                    if (entries.Count >= maxEntries) break;
                     if (!string.IsNullOrWhiteSpace(entry.FullName))
                     {
                         entries.Add(entry.FullName);
@@ -278,6 +294,7 @@ public class ArchiveScannerService
             using var archive = ArchiveFactory.OpenArchive(archivePath);
             foreach (var entry in archive.Entries)
             {
+                if (entries.Count >= maxEntries) break;
                 if (!entry.IsDirectory && !string.IsNullOrWhiteSpace(entry.Key))
                 {
                     entries.Add(entry.Key);
@@ -298,20 +315,15 @@ public class ArchiveScannerService
         CancellationToken cancellationToken = default)
     {
         var threats = new List<ThreatItem>();
-        var scanFolders = new List<string>();
-
-        // 1. User Downloads & subfolders
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var downloads = Path.Combine(userProfile, "Downloads");
-        if (Directory.Exists(downloads)) scanFolders.Add(downloads);
+        var tempDir = Path.GetTempPath().TrimEnd('\\');
 
-        // 2. Desktop
-        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        if (Directory.Exists(desktop)) scanFolders.Add(desktop);
-
-        // 3. User Temp
-        var tempPath = Path.GetTempPath();
-        if (Directory.Exists(tempPath)) scanFolders.Add(tempPath);
+        var scanFolders = new List<string>
+        {
+            Path.Combine(userProfile, "Downloads"),
+            Path.Combine(userProfile, "Desktop"),
+            tempDir
+        }.Where(Directory.Exists).ToList();
 
         logCallback?.Invoke("INFO", $"[ARCHIVE SCAN] Memindai file arsip (.zip, .rar, .7z) pada {scanFolders.Count} direktori berisiko tinggi...");
 
@@ -332,6 +344,17 @@ public class ArchiveScannerService
                 foreach (var file in Directory.EnumerateFiles(folder, "*.*", enumOptions))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+
+                    // Skip large developer build / package directories
+                    var lowerFile = file.ToLowerInvariant();
+                    if (lowerFile.Contains(@"\.git\") ||
+                        lowerFile.Contains(@"\node_modules\") ||
+                        lowerFile.Contains(@"\.dart_tool\") ||
+                        lowerFile.Contains(@"\bin\") ||
+                        lowerFile.Contains(@"\obj\"))
+                    {
+                        continue;
+                    }
 
                     if (!IsArchiveFile(file)) continue;
 
