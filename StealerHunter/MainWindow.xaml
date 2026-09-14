@@ -145,7 +145,14 @@
                                     <Grid Margin="0,4,0,0">
                                         <ProgressBar Height="6" Value="{Binding ScanProgress}" Maximum="100" Background="#1E293B" Foreground="{StaticResource BrushCyan}" BorderThickness="0" />
                                     </Grid>
-                                    <TextBlock Text="{Binding ScanStatusText}" Foreground="{StaticResource BrushTextMuted}" FontSize="11" Margin="0,4,0,0" />
+                                    <Grid Margin="0,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding ScanStatusText}" Foreground="{StaticResource BrushTextMuted}" FontSize="11" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding ScanProgressText}" Foreground="{StaticResource BrushCyan}" FontSize="11" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    </Grid>
                                 </StackPanel>
 
                                 <!-- Action Buttons -->

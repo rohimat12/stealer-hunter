@@ -119,6 +119,7 @@ public class MainViewModel : INotifyPropertyChanged
                 _isScanning = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CanStartScan));
+                OnPropertyChanged(nameof(ScanProgressText));
                 try
                 {
                     System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
@@ -137,8 +138,15 @@ public class MainViewModel : INotifyPropertyChanged
     public double ScanProgress
     {
         get => _scanProgress;
-        set { _scanProgress = value; OnPropertyChanged(); }
+        set
+        {
+            _scanProgress = Math.Clamp(value, 0, 100);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ScanProgressText));
+        }
     }
+
+    public string ScanProgressText => (IsScanning || _scanProgress > 0) ? $"{Math.Round(_scanProgress):0}%" : string.Empty;
 
     public string StatusTitle
     {

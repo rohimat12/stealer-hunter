@@ -385,4 +385,28 @@ public class SecurityServicesTests
         Assert.IsTrue(vm.QuickScanCommand.CanExecute(null), "Quick Scan should be re-enabled");
         Assert.IsTrue(vm.DeepScanCommand.CanExecute(null), "Deep Scan should be re-enabled");
     }
+
+    [TestMethod]
+    public void TestScanProgressTextFormatting()
+    {
+        var vm = new StealerHunter.ViewModels.MainViewModel();
+
+        vm.IsScanning = false;
+        vm.ScanProgress = 0;
+        Assert.AreEqual(string.Empty, vm.ScanProgressText, "Progress text should be empty when idle at 0%");
+
+        vm.IsScanning = true;
+        vm.ScanProgress = 5;
+        Assert.AreEqual("5%", vm.ScanProgressText);
+
+        vm.ScanProgress = 42.6;
+        Assert.AreEqual("43%", vm.ScanProgressText);
+
+        vm.ScanProgress = 100;
+        Assert.AreEqual("100%", vm.ScanProgressText);
+
+        vm.IsScanning = false;
+        // When scan completes and progress is at 100%
+        Assert.AreEqual("100%", vm.ScanProgressText, "Completed scan at 100% should show 100%");
+    }
 }
