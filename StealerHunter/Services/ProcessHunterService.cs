@@ -38,6 +38,7 @@ public class ProcessHunterService
                 if (proc.Id == currentPid || proc.Id <= 4) continue;
 
                 string? exePath = null;
+                DateTime? startTime = null;
                 try
                 {
                     exePath = proc.MainModule?.FileName;
@@ -45,6 +46,15 @@ public class ProcessHunterService
                 catch
                 {
                     // Access denied for protected system processes (normal)
+                }
+
+                try
+                {
+                    startTime = proc.StartTime;
+                }
+                catch
+                {
+                    // Access denied or process exited
                 }
 
                 var procName = proc.ProcessName;
@@ -65,6 +75,8 @@ public class ProcessHunterService
                             Description = $"Active process matches verified malware signature '{sig.Name}' ({sig.Type}). SHA256: {sha256}",
                             FilePath = exePath,
                             ProcessId = proc.Id,
+                            ProcessName = procName,
+                            ProcessStartTime = startTime,
                             TargetTarget = "Malware Signature Match in Memory"
                         };
                         threats.Add(threat);
@@ -91,6 +103,8 @@ public class ProcessHunterService
                                 Description = $"svchost.exe (PID {proc.Id}) was spawned by '{parentInfo.Name}' (PID {ppid}) instead of services.exe. Infostealers frequently spoof svchost.exe to bypass firewalls and disguise exfiltration.",
                                 FilePath = exePath ?? "svchost.exe",
                                 ProcessId = proc.Id,
+                                ProcessName = procName,
+                                ProcessStartTime = startTime,
                                 TargetTarget = "PPID Spoofing (MITRE ATT&CK T1036)"
                             };
                             threats.Add(threat);
@@ -111,6 +125,8 @@ public class ProcessHunterService
                                 Description = $"services.exe (PID {proc.Id}) has illegitimate parent '{parentInfo.Name}' (PID {ppid}). Expected wininit.exe.",
                                 FilePath = exePath ?? "services.exe",
                                 ProcessId = proc.Id,
+                                ProcessName = procName,
+                                ProcessStartTime = startTime,
                                 TargetTarget = "Core System Integrity / PPID Spoofing"
                             };
                             threats.Add(threat);
@@ -138,6 +154,8 @@ public class ProcessHunterService
                             Description = $"Process is actively executing from Windows Resources folder, typical of Mofksys/Icsys stealer: '{exePath}'",
                             FilePath = exePath,
                             ProcessId = proc.Id,
+                            ProcessName = procName,
+                            ProcessStartTime = startTime,
                             TargetTarget = "Windows Themes Abuse / Active Stealer"
                         };
                         threats.Add(threat);
@@ -158,6 +176,8 @@ public class ProcessHunterService
                                 Description = $"Process is disguised as explorer.exe but running from unauthorized folder: '{exePath}'",
                                 FilePath = exePath,
                                 ProcessId = proc.Id,
+                                ProcessName = procName,
+                                ProcessStartTime = startTime,
                                 TargetTarget = "Core System Masquerading"
                             };
                             threats.Add(threat);
@@ -178,6 +198,8 @@ public class ProcessHunterService
                                 Description = $"Process is masquerading as a Windows core service but is running from an unauthorized path: '{exePath}'",
                                 FilePath = exePath,
                                 ProcessId = proc.Id,
+                                ProcessName = procName,
+                                ProcessStartTime = startTime,
                                 TargetTarget = "System Integrity / Credential Memory"
                             };
                             threats.Add(threat);
@@ -220,6 +242,8 @@ public class ProcessHunterService
                             Description = $"Active process running from temporary/untrusted directory '{exePath}' without trusted digital signature ({signerInfo}). Infostealers (Lumma, Stealc) frequently execute from these locations.",
                             FilePath = exePath,
                             ProcessId = proc.Id,
+                            ProcessName = procName,
+                            ProcessStartTime = startTime,
                             TargetTarget = "Active System Memory"
                         };
                         threats.Add(threat);
@@ -245,6 +269,8 @@ public class ProcessHunterService
                             Description = $"Script runner detected with obfuscated/hidden arguments commonly used by infostealer droppers: '{cmdLine}'",
                             FilePath = exePath ?? procName,
                             ProcessId = proc.Id,
+                            ProcessName = procName,
+                            ProcessStartTime = startTime,
                             TargetTarget = "Stealer Dropper / PowerShell Payload"
                         };
                         threats.Add(threat);

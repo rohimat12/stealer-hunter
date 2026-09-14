@@ -39,7 +39,7 @@ public class QuarantineService
         // 1. If there's an active Process ID, terminate it with process identity verification
         if (threat.ProcessId.HasValue && threat.ProcessId.Value > 0)
         {
-            if (KillProcess(threat.ProcessId.Value, threat.ProcessName, threat.FilePath, out var killMsg))
+            if (KillProcess(threat.ProcessId.Value, threat.ProcessName, threat.FilePath, threat.ProcessStartTime, out var killMsg))
             {
                 messages.Add(killMsg);
             }
@@ -104,22 +104,64 @@ public class QuarantineService
         return success;
     }
 
-    public static bool KillProcess(int pid, string? expectedName, string? expectedPath, out string message)
+    public static bool KillProcess(int pid, string? expectedName, string? expectedPath, DateTime? expectedStartTime, out string message)
     {
         try
         {
             var proc = Process.GetProcessById(pid);
             var procName = proc.ProcessName;
 
-            // 1. Verify Process Identity to prevent PID Reuse / TOCTOU hazards
-            if (!string.IsNullOrEmpty(expectedName) &&
-                !procName.Equals(expectedName, StringComparison.OrdinalIgnoreCase))
+            // 1. Verify Process Identity by Name (handling optional .exe) to prevent PID Reuse / TOCTOU hazards
+            if (!string.IsNullOrEmpty(expectedName))
             {
-                message = $"Target PID {pid} was reassigned by Windows to '{procName}' (expected '{expectedName}'). Termination aborted for system safety.";
-                return false;
+                var cleanExpected = expectedName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                    ? Path.GetFileNameWithoutExtension(expectedName)
+                    : expectedName;
+
+                if (!procName.Equals(cleanExpected, StringComparison.OrdinalIgnoreCase))
+                {
+                    message = $"Target PID {pid} was reassigned by Windows to '{procName}' (expected '{cleanExpected}'). Termination aborted for system safety.";
+                    return false;
+                }
             }
 
-            // 2. Critical Windows System Process Safeguard
+            // 2. Verify Process Start Time to prevent PID reuse by an identical process name
+            if (expectedStartTime.HasValue)
+            {
+                try
+                {
+                    var actualStartTime = proc.StartTime;
+                    if (Math.Abs((actualStartTime - expectedStartTime.Value).TotalSeconds) > 2)
+                    {
+                        message = $"Target PID {pid} was reused by another instance of '{procName}' (Start time mismatch). Termination aborted for system safety.";
+                        return false;
+                    }
+                }
+                catch
+                {
+                    // If access denied to StartTime on elevated/system process, skip StartTime check
+                }
+            }
+
+            // 3. Verify executable path if expectedPath is known
+            if (!string.IsNullOrEmpty(expectedPath) && File.Exists(expectedPath))
+            {
+                try
+                {
+                    var currentPath = proc.MainModule?.FileName;
+                    if (!string.IsNullOrEmpty(currentPath) && !currentPath.Equals(expectedPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        message = $"Target PID {pid} executable path mismatch: running '{currentPath}' instead of expected '{expectedPath}'. Termination aborted for safety.";
+                        return false;
+                    }
+                }
+                catch
+                {
+                    // Protected process access denied to MainModule
+                }
+            }
+
+            // 4. Critical Windows System Process Safeguard
             var lowerName = procName.ToLowerInvariant();
             if (lowerName is "system" or "smss" or "csrss" or "wininit" or "services" or "lsass" or "winlogon" or "dwm")
             {
@@ -127,7 +169,7 @@ public class QuarantineService
                 return false;
             }
 
-            // 3. Terminate process safely
+            // 5. Terminate process safely
             proc.Kill(entireProcessTree: true);
             message = $"Terminated process '{procName}' (PID {pid})";
             return true;
@@ -144,7 +186,11 @@ public class QuarantineService
         }
     }
 
-    public static bool KillProcess(int pid, out string message) => KillProcess(pid, null, null, out message);
+    public static bool KillProcess(int pid, string? expectedName, string? expectedPath, out string message) =>
+        KillProcess(pid, expectedName, expectedPath, null, out message);
+
+    public static bool KillProcess(int pid, out string message) =>
+        KillProcess(pid, null, null, null, out message);
 
     public static bool QuarantineFile(string filePath, out string message) => QuarantineFile(filePath, out message, out _);
 

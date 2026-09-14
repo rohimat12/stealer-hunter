@@ -434,10 +434,12 @@ public class MainViewModel : INotifyPropertyChanged
         {
             foreach (var item in items)
             {
-                // Avoid duplicates by FilePath or ProcessId
+                // Avoid duplicates by FilePath or ProcessId + ProcessName / StartTime
                 bool exists = DetectedThreats.Any(t =>
                     (!string.IsNullOrEmpty(item.FilePath) && t.FilePath.Equals(item.FilePath, StringComparison.OrdinalIgnoreCase)) ||
-                    (item.ProcessId.HasValue && t.ProcessId == item.ProcessId)
+                    (item.ProcessId.HasValue && t.ProcessId == item.ProcessId &&
+                     (string.IsNullOrEmpty(item.ProcessName) || string.IsNullOrEmpty(t.ProcessName) || t.ProcessName.Equals(item.ProcessName, StringComparison.OrdinalIgnoreCase)) &&
+                     (!item.ProcessStartTime.HasValue || !t.ProcessStartTime.HasValue || Math.Abs((t.ProcessStartTime.Value - item.ProcessStartTime.Value).TotalSeconds) < 2))
                 );
 
                 if (!exists)

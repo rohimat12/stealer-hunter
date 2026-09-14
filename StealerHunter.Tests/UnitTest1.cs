@@ -280,4 +280,28 @@ public class SecurityServicesTests
             Console.WriteLine($"[TEST DETECTED] {threat.Name}: {threat.Description}");
         }
     }
+
+    [TestMethod]
+    public void TestKillProcessRejectsMismatchedProcessName()
+    {
+        var current = System.Diagnostics.Process.GetCurrentProcess();
+        bool killed = QuarantineService.KillProcess(current.Id, "completely_fake_evil_malware.exe", null, out var msg);
+
+        Assert.IsFalse(killed, "KillProcess must refuse to kill a process if expectedName does not match actual process");
+        Assert.IsTrue(msg.Contains("was reassigned by Windows") || msg.Contains("Termination aborted"), 
+            $"Message should explain abort due to name mismatch: {msg}");
+    }
+
+    [TestMethod]
+    public void TestKillProcessRejectsMismatchedStartTime()
+    {
+        var current = System.Diagnostics.Process.GetCurrentProcess();
+        var fakeStartTime = DateTime.Now.AddHours(-10);
+
+        bool killed = QuarantineService.KillProcess(current.Id, current.ProcessName, null, fakeStartTime, out var msg);
+
+        Assert.IsFalse(killed, "KillProcess must refuse to kill a process if expectedStartTime does not match");
+        Assert.IsTrue(msg.Contains("start time mismatch", StringComparison.OrdinalIgnoreCase) || msg.Contains("Termination aborted"),
+            $"Message should explain abort due to start time mismatch: {msg}");
+    }
 }

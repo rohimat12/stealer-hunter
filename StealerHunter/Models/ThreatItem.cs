@@ -36,6 +36,7 @@ public class ThreatItem : INotifyPropertyChanged
     public string FilePath { get; set; } = string.Empty;
     public int? ProcessId { get; set; }
     public string? ProcessName { get; set; }
+    public DateTime? ProcessStartTime { get; set; }
     public DateTime DetectedAt { get; set; } = DateTime.Now;
 
     public bool IsResolved
