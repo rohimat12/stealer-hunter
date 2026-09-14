@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StealerHunter", "StealerHunter\StealerHunter.csproj", "{0667F713-AF29-4966-89AC-7D9535D61592}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StealerHunter.Tests", "StealerHunter.Tests\StealerHunter.Tests.csproj", "{4F03CD9A-ADC9-4F62-A9DA-6A8894E4E778}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0667F713-AF29-4966-89AC-7D9535D61592}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0667F713-AF29-4966-89AC-7D9535D61592}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0667F713-AF29-4966-89AC-7D9535D61592}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0667F713-AF29-4966-89AC-7D9535D61592}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4F03CD9A-ADC9-4F62-A9DA-6A8894E4E778}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4F03CD9A-ADC9-4F62-A9DA-6A8894E4E778}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4F03CD9A-ADC9-4F62-A9DA-6A8894E4E778}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F03CD9A-ADC9-4F62-A9DA-6A8894E4E778}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

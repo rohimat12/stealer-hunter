@@ -1,0 +1,532 @@
+<Window x:Class="StealerHunter.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:StealerHunter.ViewModels"
+        mc:Ignorable="d"
+        Title="StealerHunter - Anti-Infostealer &amp; Browser Credential Guardian"
+        Icon="Assets/app_icon.png"
+        Height="750" Width="1120"
+        MinHeight="650" MinWidth="950"
+        WindowStartupLocation="CenterScreen"
+        Background="#0B0F19">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <BooleanToVisibilityConverter x:Key="BoolToVis" />
+            <vm:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+            <vm:ZeroToVisibilityConverter x:Key="ZeroToVis" />
+            <vm:NonZeroToVisibilityConverter x:Key="NonZeroToVis" />
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /> <!-- Top Header -->
+            <RowDefinition Height="Auto" /> <!-- In-App Alert Banner -->
+            <RowDefinition Height="*" />    <!-- Main Content Tabs -->
+            <RowDefinition Height="Auto" /> <!-- Bottom Status Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- Top Header Navigation -->
+        <Border Grid.Row="0" Background="#0E1424" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="0,0,0,1" Padding="24,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- App Brand -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#162238" CornerRadius="10" Width="44" Height="44" Margin="0,0,14,0" BorderBrush="{StaticResource BrushCyan}" BorderThickness="1" ClipToBounds="True">
+                        <Image Source="Assets/app_icon.png" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="STEALER" Foreground="{StaticResource BrushCyan}" FontWeight="Bold" FontSize="18" />
+                            <TextBlock Text="HUNTER" Foreground="{StaticResource BrushTextPrimary}" FontWeight="Bold" FontSize="18" Margin="4,0,0,0" />
+                            <Border Background="#1E293B" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="v1.0" Foreground="{StaticResource BrushTextSecondary}" FontSize="10" FontWeight="SemiBold" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="Anti-Infostealer &amp; Browser Credential Guardian" Foreground="{StaticResource BrushTextMuted}" FontSize="11" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Status Badge Right -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#131B2E" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="20" Padding="12,6" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="{StaticResource BrushEmerald}" Margin="0,0,8,0" />
+                            <TextBlock Text="GUARD ACTIVE" Foreground="{StaticResource BrushTextPrimary}" FontSize="11" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- In-App Threat Notification Alert Banner -->
+        <Border Grid.Row="1" Background="#2E0D17" BorderBrush="#FF2E63" BorderThickness="1" CornerRadius="8" Padding="16,12" Margin="24,14,24,0"
+                Visibility="{Binding HasActiveThreatAlert, Converter={StaticResource BoolToVis}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="🚨" FontSize="26" VerticalAlignment="Center" Margin="0,0,14,0" />
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="PERINGATAN: ANCAMAN PENCURI KREDENSIAL TERDETEKSI!" Foreground="#FF2E63" FontWeight="Bold" FontSize="13" />
+                    <TextBlock Text="{Binding ActiveAlertMessage, Mode=OneWay}" Foreground="{StaticResource BrushTextPrimary}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+                    <Button Content="🛡️ Netralkan Sekarang" Style="{StaticResource BtnDanger}" Command="{Binding NeutralizeAllCommand}" Margin="0,0,8,0" />
+                    <Button Content="✕ Tutup" Style="{StaticResource BtnSecondary}" Command="{Binding DismissAlertCommand}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Tabs -->
+        <TabControl Grid.Row="2" Background="Transparent" BorderThickness="0" SelectedIndex="{Binding SelectedTabIndex}">
+            
+            <!-- TAB 1: SCANNER & DASHBOARD -->
+            <TabItem Header="🛡️ Scanner &amp; Dashboard" Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="24">
+                    <StackPanel>
+                        
+                        <!-- Hero Status Card -->
+                        <Border Style="{StaticResource CyberCard}" Padding="24,20" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Status Shield Icon -->
+                                <Border Grid.Column="0" Width="60" Height="60" CornerRadius="30" Margin="0,0,20,0"
+                                        Background="#162238" BorderThickness="2">
+                                    <Border.BorderBrush>
+                                        <SolidColorBrush Color="{Binding StatusColor, FallbackValue=#00E676}" />
+                                    </Border.BorderBrush>
+                                    <TextBlock Text="🛡️" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+
+                                <!-- Title, Subtitle, Progress -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding StatusTitle}" FontSize="18" FontWeight="Bold">
+                                        <TextBlock.Foreground>
+                                            <SolidColorBrush Color="{Binding StatusColor, FallbackValue=#00E676}" />
+                                        </TextBlock.Foreground>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding StatusSubtitle}" Foreground="{StaticResource BrushTextSecondary}" FontSize="12" Margin="0,4,0,8" TextWrapping="Wrap" />
+
+                                    <!-- Progress bar when scanning -->
+                                    <Grid Margin="0,4,0,0">
+                                        <ProgressBar Height="6" Value="{Binding ScanProgress}" Maximum="100" Background="#1E293B" Foreground="{StaticResource BrushCyan}" BorderThickness="0" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding ScanStatusText}" Foreground="{StaticResource BrushTextMuted}" FontSize="11" Margin="0,4,0,0" />
+                                </StackPanel>
+
+                                <!-- Action Buttons -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
+                                    <Button Content="⚡ Quick Scan" Style="{StaticResource BtnPrimary}" Command="{Binding QuickScanCommand}" Margin="0,0,10,0" />
+                                    <Button Content="🔍 Deep Scan" Style="{StaticResource BtnSecondary}" Command="{Binding DeepScanCommand}" Margin="0,0,10,0" />
+                                    <Button Content="⏹ Stop" Style="{StaticResource BtnDanger}" Command="{Binding CancelScanCommand}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Metric Cards Grid -->
+                        <UniformGrid Columns="4" Margin="0,0,0,16">
+                            <!-- Metric 1: Threats Found -->
+                            <Border Style="{StaticResource CyberCard}" Margin="0,0,8,0">
+                                <StackPanel>
+                                    <TextBlock Text="THREATS FOUND" Foreground="{StaticResource BrushTextMuted}" FontSize="11" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding ThreatsCount}" FontSize="28" FontWeight="Bold" Margin="0,6,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource BrushEmerald}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ThreatsCount}" Value="0">
+                                                        <Setter Property="Foreground" Value="{StaticResource BrushEmerald}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="Active infostealer indicators" Foreground="{StaticResource BrushTextSecondary}" FontSize="11" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Metric 2: Neutralized -->
+                            <Border Style="{StaticResource CyberCard}" Margin="4,0,4,0">
+                                <StackPanel>
+                                    <TextBlock Text="NEUTRALIZED ITEMS" Foreground="{StaticResource BrushTextMuted}" FontSize="11" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding ResolvedCount}" Foreground="{StaticResource BrushCyan}" FontSize="28" FontWeight="Bold" Margin="0,6,0,0" />
+                                    <TextBlock Text="Quarantined / processes killed" Foreground="{StaticResource BrushTextSecondary}" FontSize="11" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Metric 3: Protected Browsers -->
+                            <Border Style="{StaticResource CyberCard}" Margin="4,0,4,0">
+                                <StackPanel>
+                                    <TextBlock Text="PROTECTED BROWSERS" Foreground="{StaticResource BrushTextMuted}" FontSize="11" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding InstalledBrowsersCount}" Foreground="{StaticResource BrushTextPrimary}" FontSize="28" FontWeight="Bold" Margin="0,6,0,0" />
+                                    <TextBlock Text="Chrome, Edge, Brave, etc." Foreground="{StaticResource BrushTextSecondary}" FontSize="11" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Metric 4: Realtime Guard -->
+                            <Border Style="{StaticResource CyberCard}" Margin="8,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="REALTIME WATCHER" Foreground="{StaticResource BrushTextMuted}" FontSize="11" FontWeight="SemiBold" />
+                                    <TextBlock Text="SHIELD ON" Foreground="{StaticResource BrushEmerald}" FontSize="20" FontWeight="Bold" Margin="0,12,0,0" />
+                                    <TextBlock Text="%TEMP% &amp; Staging watcher" Foreground="{StaticResource BrushTextSecondary}" FontSize="11" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <!-- Detected Threats Section -->
+                        <Border Style="{StaticResource CyberCard}" Padding="20">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="⚠️ DETECTED THREATS &amp; STAGED DUMPS" Foreground="{StaticResource BrushTextPrimary}" FontSize="14" FontWeight="Bold" />
+                                        <Border Background="#1E293B" CornerRadius="10" Padding="8,2" Margin="10,0,0,0">
+                                            <TextBlock Text="{Binding ThreatsCount, StringFormat='{}{0} Threats'}" Foreground="{StaticResource BrushTextSecondary}" FontSize="11" />
+                                        </Border>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="1" Content="🛡️ NEUTRALIZE ALL THREATS" Style="{StaticResource BtnDanger}" Command="{Binding NeutralizeAllCommand}" />
+                                </Grid>
+
+                                <!-- Threat List Items -->
+                                <ItemsControl ItemsSource="{Binding DetectedThreats}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#182238" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- Icon -->
+                                                    <TextBlock Grid.Column="0" Text="{Binding CategoryIcon}" FontSize="24" VerticalAlignment="Center" Margin="0,0,14,0" />
+
+                                                    <!-- Info -->
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Border Background="{Binding SeverityBadgeColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
+                                                                <TextBlock Text="{Binding Severity}" Foreground="#FFFFFF" FontSize="10" FontWeight="Bold" />
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource BrushTextPrimary}" FontWeight="SemiBold" FontSize="13" />
+                                                        </StackPanel>
+
+                                                        <TextBlock Text="{Binding Description}" Foreground="{StaticResource BrushTextSecondary}" FontSize="11" Margin="0,4,0,2" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding FilePath, StringFormat='Location: {0}'}" Foreground="{StaticResource BrushTextMuted}" FontSize="10" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+
+                                                    <!-- Single Threat Neutralize Button -->
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0">
+                                                        <Button Content="Neutralize" Style="{StaticResource BtnDanger}"
+                                                                Command="{Binding DataContext.NeutralizeThreatCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Visibility="{Binding IsResolved, Converter={StaticResource InverseBoolToVis}}" />
+                                                        <TextBlock Text="✔ Neutralized" Foreground="{StaticResource BrushEmerald}" FontWeight="Bold" FontSize="12"
+                                                                   Visibility="{Binding IsResolved, Converter={StaticResource BoolToVis}}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Empty Placeholder -->
+                                <Border Background="#0E1424" CornerRadius="8" Padding="20" Margin="0,4,0,0"
+                                        Visibility="{Binding ThreatsCount, Converter={StaticResource ZeroToVis}}">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Text="✔" Foreground="{StaticResource BrushEmerald}" FontSize="28" HorizontalAlignment="Center" />
+                                        <TextBlock Text="No active infostealer threats detected" Foreground="{StaticResource BrushTextPrimary}" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" Margin="0,6,0,2" />
+                                        <TextBlock Text="Your browser databases, registry keys, and memory are clean." Foreground="{StaticResource BrushTextMuted}" FontSize="11" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- TAB 2: BROWSER SHIELDS -->
+            <TabItem Header="🌐 Browser Shields" Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24">
+                    <StackPanel>
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="BROWSER CREDENTIAL VAULT INTEGRITY" Foreground="{StaticResource BrushCyan}" FontWeight="Bold" FontSize="15" />
+                                <TextBlock Text="Infostealers (Lumma, RedLine, Stealc) target SQLite databases storing your passwords, session cookies, and DPAPI master keys. Below are your detected browser stores." Foreground="{StaticResource BrushTextSecondary}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <ItemsControl ItemsSource="{Binding DetectedBrowsers}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource CyberCard}" Margin="0,0,0,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Browser Icon -->
+                                            <TextBlock Grid.Column="0" Text="{Binding BrowserIcon}" FontSize="28" VerticalAlignment="Center" Margin="0,0,16,0" />
+
+                                            <!-- Details -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding BrowserName}" Foreground="{StaticResource BrushTextPrimary}" FontWeight="Bold" FontSize="14" />
+                                                    <Border Background="#1E293B" CornerRadius="4" Padding="6,2" Margin="8,0,0,0">
+                                                        <TextBlock Text="{Binding Engine}" Foreground="{StaticResource BrushTextSecondary}" FontSize="10" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding ProfilePath}" Foreground="{StaticResource BrushTextMuted}" FontSize="11" Margin="0,4,0,4" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding StatusSummary}" Foreground="{StaticResource BrushEmerald}" FontSize="11" FontWeight="Medium" />
+                                            </StackPanel>
+
+                                            <!-- Status Tag -->
+                                            <Border Grid.Column="2" CornerRadius="6" Padding="10,6" VerticalAlignment="Center" Background="#162238">
+                                                <TextBlock Text="Guarded" Foreground="{StaticResource BrushCyan}" FontSize="11" FontWeight="Bold" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- TAB 3: LIVE LOGS -->
+            <TabItem Header="📜 Live Logs" Style="{StaticResource ModernTabItem}">
+                <Grid Margin="24">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="REALTIME SCANNER TELEMETRY" Foreground="{StaticResource BrushTextPrimary}" FontWeight="Bold" FontSize="13" />
+                            <TextBlock Text="{Binding ScanLogs.Count, Mode=OneWay, StringFormat='({0} events)'}" Foreground="{StaticResource BrushTextMuted}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Button HorizontalAlignment="Right" Content="Clear Logs" Style="{StaticResource BtnSecondary}" Command="{Binding ClearLogsCommand}" Padding="12,6" />
+                    </Grid>
+
+                    <Border Grid.Row="1" Background="#060A12" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="8" Padding="14">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding ScanLogs}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,3">
+                                            <!-- Timestamp -->
+                                            <TextBlock Text="{Binding FormattedTime, Mode=OneWay}" DockPanel.Dock="Left" FontFamily="Consolas, monospace" FontSize="11" Foreground="#64748B" Margin="0,2,8,0" />
+
+                                            <!-- Level Badge -->
+                                            <Border DockPanel.Dock="Left" Background="{Binding LogBg, Mode=OneWay}" BorderBrush="{Binding LogColor, Mode=OneWay}" BorderThickness="1" CornerRadius="3" Padding="6,1" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Level, Mode=OneWay}" Foreground="{Binding LogColor, Mode=OneWay}" FontFamily="Consolas, monospace" FontSize="10" FontWeight="Bold" />
+                                            </Border>
+
+                                            <!-- Message -->
+                                            <TextBlock Text="{Binding Message, Mode=OneWay}" Foreground="{StaticResource BrushTextPrimary}" FontFamily="Consolas, monospace" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- TAB 4: EMERGENCY GUIDE -->
+            <TabItem Header="🚨 Emergency Checklist" Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24">
+                    <StackPanel>
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="🚨 WHAT TO DO IF YOUR PASSWORDS WERE STOLEN?" Foreground="{StaticResource BrushDanger}" FontWeight="Bold" FontSize="16" />
+                                <TextBlock Text="Infostealers grab active session cookies and passwords. Even if the virus file is deleted, hackers may already have your session tokens. Execute these emergency steps immediately:" Foreground="{StaticResource BrushTextSecondary}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="1. Revoke All Active Sessions (Kill Cookies)" Foreground="{StaticResource BrushCyan}" FontWeight="Bold" FontSize="13" />
+                                <TextBlock Text="Log in to your Google Account (myaccount.google.com/device-activity) and Microsoft Account, then click 'Sign out of all other sessions'. This immediately invalidates the stolen cookies!" Foreground="{StaticResource BrushTextSecondary}" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="2. Change Primary Email Password First" Foreground="{StaticResource BrushCyan}" FontWeight="Bold" FontSize="13" />
+                                <TextBlock Text="Your email is the master key for password resets. Change your primary Gmail/Outlook password immediately from another clean device or phone." Foreground="{StaticResource BrushTextSecondary}" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="3. Enable Authenticator App (2FA)" Foreground="{StaticResource BrushCyan}" FontWeight="Bold" FontSize="13" />
+                                <TextBlock Text="Switch from SMS 2FA to App-based 2FA (Google Authenticator, Aegis, Bitwarden). Infostealers cannot steal hardware/app OTP generators." Foreground="{StaticResource BrushTextSecondary}" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="4. Reset Telegram &amp; Discord Sessions" Foreground="{StaticResource BrushCyan}" FontWeight="Bold" FontSize="13" />
+                                <TextBlock Text="Infostealers steal Telegram 'tdata' and Discord tokens. Go to Telegram Settings -> Devices -> Terminate all other sessions. In Discord, change your password to revoke all active tokens." Foreground="{StaticResource BrushTextSecondary}" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CyberCard}">
+                            <StackPanel>
+                                <TextBlock Text="5. Migrate Web3 / Crypto Wallets" Foreground="{StaticResource BrushDanger}" FontWeight="Bold" FontSize="13" />
+                                <TextBlock Text="If you had MetaMask, Phantom, or Trust Wallet extension installed, consider your private keys compromised. Transfer funds immediately to a fresh address created on a clean device." Foreground="{StaticResource BrushTextSecondary}" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- TAB 5: SETTINGS & AUTO-START -->
+            <TabItem Header="⚙️ Settings &amp; Auto-Start" Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24">
+                    <StackPanel>
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="AUTO-START &amp; SYSTEM INTEGRATION" Foreground="{StaticResource BrushCyan}" FontWeight="Bold" FontSize="15" />
+                                <TextBlock Text="Configure automatic startup with Windows and background protection settings." Foreground="{StaticResource BrushTextSecondary}" FontSize="12" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Toggle 1: Run on Startup -->
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Run StealerHunter on Windows Startup" Foreground="{StaticResource BrushTextPrimary}" FontWeight="SemiBold" FontSize="13" />
+                                    <TextBlock Text="Registers the application in Windows Startup Registry (HKCU\Run) to run automatically on boot with --silent mode." Foreground="{StaticResource BrushTextMuted}" FontSize="11" Margin="0,4,0,0" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" IsChecked="{Binding RunOnStartup}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Toggle 2: Minimize to Tray -->
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Minimize to System Tray on Close" Foreground="{StaticResource BrushTextPrimary}" FontWeight="SemiBold" FontSize="13" />
+                                    <TextBlock Text="Closing the window will hide StealerHunter in the notification area beside the Windows clock instead of terminating it." Foreground="{StaticResource BrushTextMuted}" FontSize="11" Margin="0,4,0,0" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" IsChecked="{Binding StartMinimizedToTray}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Toggle 3: Realtime Watcher -->
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Realtime %TEMP% &amp; Staged Exfiltration Watcher" Foreground="{StaticResource BrushTextPrimary}" FontWeight="SemiBold" FontSize="13" />
+                                    <TextBlock Text="Continuously monitors the Windows temporary directory for unauthorized dump files or exfiltration zip archives." Foreground="{StaticResource BrushTextMuted}" FontSize="11" Margin="0,4,0,0" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" IsChecked="{Binding RealtimeProtectionEnabled}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Toggle 4: Sound Alarm Alert on Threat Detection -->
+                        <Border Style="{StaticResource CyberCard}" Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Audio Sound Alert on Threat Detection" Foreground="{StaticResource BrushTextPrimary}" FontWeight="SemiBold" FontSize="13" />
+                                    <TextBlock Text="Plays an audible warning alarm tone immediately whenever an active infostealer threat or staging file is intercepted." Foreground="{StaticResource BrushTextMuted}" FontSize="11" Margin="0,4,0,0" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" IsChecked="{Binding SoundAlertOnThreat}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Quarantine Folder Action -->
+                        <Border Style="{StaticResource CyberCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Quarantine Vault" Foreground="{StaticResource BrushTextPrimary}" FontWeight="SemiBold" FontSize="13" />
+                                    <TextBlock Text="Isolated malware files and neutralized staging dumps are safely renamed and locked in this folder." Foreground="{StaticResource BrushTextMuted}" FontSize="11" Margin="0,4,0,0" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Open Quarantine Folder" Style="{StaticResource BtnSecondary}" Command="{Binding OpenQuarantineFolderCommand}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+        </TabControl>
+
+        <!-- Bottom Status Bar -->
+        <Border Grid.Row="3" Background="#090E1A" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="0,1,0,0" Padding="20,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Database Target: Lumma, RedLine, Stealc, Vidar, Raccoon" Foreground="{StaticResource BrushTextMuted}" FontSize="11" />
+                    <TextBlock Text="|" Foreground="{StaticResource BrushBorderDark}" Margin="10,0" />
+                    <TextBlock Text="DPAPI &amp; SQLite Shield Active" Foreground="{StaticResource BrushEmerald}" FontSize="11" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text=".NET 8.0 Windows x64" Foreground="{StaticResource BrushTextMuted}" FontSize="11" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
