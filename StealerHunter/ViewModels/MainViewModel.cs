@@ -62,10 +62,12 @@ public class MainViewModel : INotifyPropertyChanged
         _startMinimizedToTray = _settings.StartMinimizedToTray;
         _soundAlertOnThreat = _settings.SoundAlertOnThreat;
 
-        // Initialize Realtime watcher if enabled
+        // Initialize Realtime watcher
+        _watcherService.SuspiciousActivityDetected += OnSuspiciousActivityDetected;
+        _watcherService.WatcherLog += (level, msg) => AddLog(level, msg);
+
         if (_realtimeProtectionEnabled)
         {
-            _watcherService.SuspiciousActivityDetected += OnSuspiciousActivityDetected;
             _watcherService.Start();
         }
 

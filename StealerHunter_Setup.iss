@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "StealerHunter"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "CyberSecurity Lab"
 #define MyAppExeName "StealerHunter.exe"
 #define MyAppAssocName "StealerHunter Security Scanner"

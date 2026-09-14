@@ -39,9 +39,8 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo ========================================================
-echo  SUCCESS! Installer generated at:
-echo  installer_output\StealerHunter_Setup_v1.0.0.exe
+echo  SUCCESS! Installer generated in:
+echo  installer_output\
 echo ========================================================
 echo.
 pause

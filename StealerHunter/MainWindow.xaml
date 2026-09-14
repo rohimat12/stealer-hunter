@@ -56,7 +56,7 @@
                             <TextBlock Text="STEALER" Foreground="{StaticResource BrushCyan}" FontWeight="Bold" FontSize="18" />
                             <TextBlock Text="HUNTER" Foreground="{StaticResource BrushTextPrimary}" FontWeight="Bold" FontSize="18" Margin="4,0,0,0" />
                             <Border Background="#1E293B" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="v1.0" Foreground="{StaticResource BrushTextSecondary}" FontSize="10" FontWeight="SemiBold" />
+                                <TextBlock Text="v1.1" Foreground="{StaticResource BrushTextSecondary}" FontSize="10" FontWeight="SemiBold" />
                             </Border>
                         </StackPanel>
                         <TextBlock Text="Anti-Infostealer &amp; Browser Credential Guardian" Foreground="{StaticResource BrushTextMuted}" FontSize="11" />

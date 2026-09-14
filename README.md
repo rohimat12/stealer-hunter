@@ -73,16 +73,17 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
    * **Minimize to System Tray**: Bersembunyi di area notifikasi pojok kanan bawah dengan menu konteks klik kanan.
    * **Boot Quick Scan**: Pemindaian otomatis seketika saat komputer dinyalakan.
 
-2. **Realtime %TEMP% & Staging Watcher**:
-   * Memantau folder `%TEMP%` dan staging directory menggunakan `FileSystemWatcher`.
-   * Memergoki pembuatan file dump curian (`passwords.txt`, `cookies.txt`, `wallets`, atau arsip zip mencurigakan) dan memunculkan notifikasi Windows Toast seketika.
+2. **Realtime %TEMP% & Staging Watcher (64KB Buffer Protection)**:
+   * Memantau folder `%TEMP%` dan staging directory menggunakan `FileSystemWatcher` dengan buffer berkecepatan tinggi **64 KB** untuk mencegah *buffer overflow* saat I/O sistem padat.
+   * Memergoki pembuatan file dump curian (`passwords.txt`, `cookies.txt`, `wallets`, atau arsip zip mencurigakan) dan memicu penanganan darurat seketika.
 
 3. **Browser Vault Integrity Shield**:
    * Memeriksa integritas database kredensial untuk **Google Chrome, Microsoft Edge, Brave, Mozilla Firefox, Opera Stable, Opera GX, dan Vivaldi**.
    * Mendeteksi penguncian berkas (*file lock*) mencurigakan oleh program asing di saat browser sedang ditutup.
 
-4. **Process & Memory Hunter**:
-   * Memindai proses aktif yang berjalan dari direktori berisiko tinggi (`%TEMP%`, `%APPDATA%`, `Downloads`, `Public`).
+4. **Process & Memory Hunter (Authenticode Digital Signature Verification)**:
+   * **Validasi Tanda Tangan Digital Resmi (X509)**: Memverifikasi sertifikat digital vendor terpercaya (Microsoft, Google, Acer, NVIDIA, Valve, dll.) untuk meniadakan *false positive* pada updater resmi.
+   * **Isolasi Berkas Unsigned/Tanpa Sertifikat**: Memindai dan menandai proses asing tanpa tanda tangan digital yang berjalan dari lokasi berisiko (`%TEMP%`, `%APPDATA%`, `Downloads`, `Public`).
    * Mendeteksi proses yang menyamar (*masquerading system processes* seperti `svchost.exe` palsu).
    * Mendeteksi eksekusi skrip tersembunyi (PowerShell `-w hidden -enc`, skrip obfuscated).
 

@@ -154,19 +154,28 @@ public class ProcessHunterService
 
                     if (isSuspiciousLocation || hasDoubleExtension)
                     {
-                        // Exclude known dev runners if present, but flag executable binaries
+                        // Verify digital signature to whitelist official vendor updaters (Google, Microsoft, Acer, NVIDIA, etc.)
+                        bool isTrustedSigned = DigitalSignatureHelper.IsTrustedOrSigned(exePath, out var signerInfo);
+
+                        if (isTrustedSigned && !hasDoubleExtension)
+                        {
+                            logCallback?.Invoke("INFO", $"[WHITELIST] Trusted signed binary in high-risk path: {procName} (PID {proc.Id}, {signerInfo})");
+                            continue;
+                        }
+
+                        // Flag unsigned or masqueraded executables
                         var threat = new ThreatItem
                         {
-                            Name = hasDoubleExtension ? $"Fake File Extension Dropper: {fileName}" : $"Suspicious Executable from High-Risk Folder: {fileName}",
+                            Name = hasDoubleExtension ? $"Fake File Extension Dropper: {fileName}" : $"Unsigned Executable in High-Risk Folder: {fileName}",
                             Category = ThreatCategory.SuspiciousProcess,
                             Severity = hasDoubleExtension ? ThreatSeverity.Critical : ThreatSeverity.High,
-                            Description = $"Active process running from temporary/untrusted directory '{exePath}'. Infostealers (Lumma, Stealc) frequently execute from these locations.",
+                            Description = $"Active process running from temporary/untrusted directory '{exePath}' without trusted digital signature ({signerInfo}). Infostealers (Lumma, Stealc) frequently execute from these locations.",
                             FilePath = exePath,
                             ProcessId = proc.Id,
                             TargetTarget = "Active System Memory"
                         };
                         threats.Add(threat);
-                        logCallback?.Invoke("WARN", $"[HIGH] Process running from high-risk path: {procName} (PID {proc.Id}) at {exePath}");
+                        logCallback?.Invoke("WARN", $"[HIGH] Unsigned process in high-risk path: {procName} (PID {proc.Id}, {signerInfo}) at {exePath}");
                         continue;
                     }
                 }

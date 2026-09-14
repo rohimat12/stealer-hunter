@@ -6,6 +6,7 @@ public class RealtimeWatcherService : IDisposable
 {
     private FileSystemWatcher? _tempWatcher;
     public event Action<string, string>? SuspiciousActivityDetected;
+    public event Action<string, string>? WatcherLog;
     public bool IsActive { get; private set; }
 
     public void Start()
@@ -21,10 +22,12 @@ public class RealtimeWatcherService : IDisposable
                 {
                     NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite,
                     IncludeSubdirectories = true,
+                    InternalBufferSize = 65536, // 64 KB maximum safe buffer to prevent InternalBufferOverflowException
                     EnableRaisingEvents = true
                 };
 
                 _tempWatcher.Created += OnTempItemCreated;
+                _tempWatcher.Error += OnWatcherError;
             }
 
             IsActive = true;
@@ -45,6 +48,7 @@ public class RealtimeWatcherService : IDisposable
             {
                 _tempWatcher.EnableRaisingEvents = false;
                 _tempWatcher.Created -= OnTempItemCreated;
+                _tempWatcher.Error -= OnWatcherError;
                 _tempWatcher.Dispose();
                 _tempWatcher = null;
             }
@@ -55,6 +59,12 @@ public class RealtimeWatcherService : IDisposable
         }
 
         IsActive = false;
+    }
+
+    private void OnWatcherError(object sender, ErrorEventArgs e)
+    {
+        var ex = e.GetException();
+        WatcherLog?.Invoke("WARN", $"Realtime %TEMP% watcher handled I/O surge: {ex?.Message ?? "Internal buffer surge recovered."}");
     }
 
     private void OnTempItemCreated(object sender, FileSystemEventArgs e)
