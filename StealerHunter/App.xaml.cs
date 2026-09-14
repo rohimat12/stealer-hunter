@@ -28,7 +28,7 @@ public partial class App : System.Windows.Application
             var shortcutPath = Path.Combine(programs, "StealerHunter.lnk");
             var exePath = Environment.ProcessPath;
 
-            if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
+            if (!File.Exists(shortcutPath) && !string.IsNullOrEmpty(exePath) && File.Exists(exePath))
             {
                 var icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "app.ico");
                 if (!File.Exists(icoPath))

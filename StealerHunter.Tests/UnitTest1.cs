@@ -67,8 +67,8 @@ public class SecurityServicesTests
         try
         {
             var success = QuarantineService.QuarantineFile(testFile, out var msg);
-
-            Assert.IsTrue(success, "QuarantineFile should return true on valid file");
+            if (!success) Console.WriteLine($"[TEST FAILED QuarantineFile] {msg}");
+            Assert.IsTrue(success, $"QuarantineFile failed: {msg}");
             Assert.IsFalse(File.Exists(testFile), "Original test file should have been moved");
             Assert.IsTrue(msg.Contains("isolated to quarantine"), "Message should confirm isolation");
         }
@@ -326,5 +326,34 @@ public class SecurityServicesTests
         Assert.IsTrue(QuarantineService.IsProtectedBrowserCredentialFile(chromeLoginData), "Login Data must be immune");
         Assert.IsTrue(QuarantineService.IsProtectedBrowserCredentialFile(edgeCookies), "Cookies must be immune");
         Assert.IsFalse(QuarantineService.IsProtectedBrowserCredentialFile(randomFile), "Temp random file must not be immune");
+    }
+
+    [TestMethod]
+    public void TestRestoreQuarantinedFileAvoidsBlindOverwrite()
+    {
+        var tempFolder = Path.Combine(Path.GetTempPath(), "SH_RestoreTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempFolder);
+
+        try
+        {
+            var existingCleanFile = Path.Combine(tempFolder, "app.exe");
+            File.WriteAllText(existingCleanFile, "CLEAN_LEGITIMATE_VERSION");
+
+            var mockQuarantine = Path.Combine(tempFolder, "threat.quarantined");
+            byte[] malwareBytes = { 0x11, 0x22, 0x33, 0x44 };
+            byte[] xorBytes = malwareBytes.Select(b => (byte)(b ^ 0x5A)).ToArray();
+            File.WriteAllBytes(mockQuarantine, xorBytes);
+
+            bool success = QuarantineService.RestoreQuarantinedFile(mockQuarantine, existingCleanFile, out var msg);
+
+            Assert.IsTrue(success);
+            Assert.AreEqual("CLEAN_LEGITIMATE_VERSION", File.ReadAllText(existingCleanFile), "Clean file must never be overwritten");
+            Assert.IsTrue(File.Exists(existingCleanFile + ".restored"), "Restored file must be saved as .restored");
+            CollectionAssert.AreEqual(malwareBytes, File.ReadAllBytes(existingCleanFile + ".restored"));
+        }
+        finally
+        {
+            if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true);
+        }
     }
 }

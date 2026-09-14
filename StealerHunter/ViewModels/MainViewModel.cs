@@ -331,13 +331,13 @@ public class MainViewModel : INotifyPropertyChanged
 
                 // 3. Scan Persistence & Startup
                 ct.ThrowIfCancellationRequested();
-                UpdateScanStatus("Scanning Registry Run keys and Startup folder...", 70);
+                UpdateScanStatus("Scanning Registry Run keys and Startup folder...", 60);
                 var persistenceThreats = _persistenceService.ScanPersistence(AddLog);
                 AddThreats(persistenceThreats);
 
                 // 4. Staged Data Hunter (Exfiltration folders & zips)
                 ct.ThrowIfCancellationRequested();
-                UpdateScanStatus("Hunting for staged exfiltration archives in %TEMP%...", isDeepScan ? 60 : 90);
+                UpdateScanStatus("Hunting for staged exfiltration archives in %TEMP%...", isDeepScan ? 70 : 85);
                 var stagedThreats = _stagedDataHunter.ScanStagedData(AddLog);
                 AddThreats(stagedThreats);
 
@@ -345,7 +345,7 @@ public class MainViewModel : INotifyPropertyChanged
                 if (isDeepScan)
                 {
                     ct.ThrowIfCancellationRequested();
-                    UpdateScanStatus("Memindai Master File Table (MFT) & USN Journal pada semua drive...", 70);
+                    UpdateScanStatus("Memindai Master File Table (MFT) & USN Journal pada semua drive...", 80);
                     var mftThreats = _mftDeepScanService.ScanAllDrivesDeepMft(
                         AddLog,
                         (msg, pct) => UpdateScanStatus(msg, pct),
@@ -354,7 +354,7 @@ public class MainViewModel : INotifyPropertyChanged
 
                     // 6. Archive Inspector (.zip, .rar, .7z in Downloads, Desktop, Temp)
                     ct.ThrowIfCancellationRequested();
-                    UpdateScanStatus("Memeriksa konten file arsip (.zip, .rar, .7z) di Downloads & Temp...", 85);
+                    UpdateScanStatus("Memeriksa konten file arsip (.zip, .rar, .7z) di Downloads & Temp...", 90);
                     var archiveThreats = _archiveScanner.ScanVulnerableArchiveLocations(
                         AddLog,
                         (msg, pct) => UpdateScanStatus(msg, pct),
@@ -395,17 +395,19 @@ public class MainViewModel : INotifyPropertyChanged
         }
         catch (OperationCanceledException)
         {
+            UpdateScanStatus("Scan cancelled by user.", 0);
+            AddLog("WARN", "Scan operation was cancelled.");
             StatusTitle = "SCAN CANCELLED";
-            StatusSubtitle = "Pemindaian dihentikan oleh pengguna.";
-            StatusColor = "#F4CE14";
-            AddLog("WARN", "Scan was cancelled by user.");
+            StatusSubtitle = "Threat scanning was aborted.";
+            StatusColor = "#FFB300";
         }
         catch (Exception ex)
         {
-            StatusTitle = "SCAN ERROR";
+            UpdateScanStatus("Scan failed.", 0);
+            AddLog("DANGER", $"Scan error: {ex.Message}");
+            StatusTitle = "SCAN ENCOUNTERED ERROR";
             StatusSubtitle = ex.Message;
             StatusColor = "#FF2E63";
-            AddLog("DANGER", $"Error during scan: {ex.Message}");
         }
         finally
         {
@@ -426,12 +428,13 @@ public class MainViewModel : INotifyPropertyChanged
         ScanProgress = progress;
     }
 
-    private void AddThreats(List<ThreatItem> items)
+    public void AddThreats(List<ThreatItem> items)
     {
         if (items.Count == 0) return;
 
         System.Windows.Application.Current?.Dispatcher.Invoke(() =>
         {
+            var newlyAdded = new List<ThreatItem>();
             foreach (var item in items)
             {
                 // Avoid duplicates by FilePath or ProcessId + ProcessName / StartTime
@@ -445,14 +448,25 @@ public class MainViewModel : INotifyPropertyChanged
                 if (!exists)
                 {
                     DetectedThreats.Add(item);
-                    TriggerThreatAlert(item.Name, item.Description);
+                    newlyAdded.Add(item);
                 }
             }
             OnPropertyChanged(nameof(ThreatsCount));
+
+            // Coalesce alert: Trigger a single consolidated alert rather than bombarding sounds
+            if (newlyAdded.Count == 1)
+            {
+                TriggerThreatAlert(newlyAdded[0].Name, newlyAdded[0].Description);
+            }
+            else if (newlyAdded.Count > 1)
+            {
+                TriggerThreatAlert($"{newlyAdded.Count} Threats Intercepted",
+                    $"{newlyAdded.Count} active security threats were detected and require attention.");
+            }
         });
     }
 
-    public void NeutralizeAllThreats()
+    public async void NeutralizeAllThreats()
     {
         var unresolved = DetectedThreats.Where(t => !t.IsResolved).ToList();
         if (unresolved.Count == 0) return;
@@ -471,21 +485,38 @@ public class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        AddLog("WARN", $"Executing mass neutralization of {unresolved.Count} threats...");
+        AddLog("WARN", $"Executing mass neutralization of {unresolved.Count} threats in background...");
 
-        foreach (var threat in unresolved)
+        bool anyRebootRequired = false;
+        await Task.Run(() =>
         {
-            NeutralizeSingleThreatInternal(threat);
-        }
+            foreach (var threat in unresolved)
+            {
+                NeutralizeSingleThreatInternal(threat);
+                if (threat.StatusMessage.Contains("REBOOT REQUIRED", StringComparison.OrdinalIgnoreCase))
+                {
+                    anyRebootRequired = true;
+                }
+            }
+        });
 
         OnPropertyChanged(nameof(ThreatsCount));
         OnPropertyChanged(nameof(ResolvedCount));
 
         if (DetectedThreats.All(t => t.IsResolved))
         {
-            StatusTitle = "ALL THREATS NEUTRALIZED";
-            StatusSubtitle = "Malware processes killed and rogue files quarantined successfully.";
-            StatusColor = "#00E676";
+            if (anyRebootRequired)
+            {
+                StatusTitle = "REBOOT REQUIRED TO FINALIZE";
+                StatusSubtitle = "Locked malware files are queued for kernel deletion upon next system restart.";
+                StatusColor = "#FFB300";
+            }
+            else
+            {
+                StatusTitle = "ALL THREATS NEUTRALIZED";
+                StatusSubtitle = "Malware processes killed and rogue files quarantined successfully.";
+                StatusColor = "#00E676";
+            }
             HasActiveThreatAlert = false;
         }
     }
@@ -601,7 +632,7 @@ public class MainViewModel : INotifyPropertyChanged
 
     public void AddLog(string level, string message)
     {
-        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
         {
             ScanLogs.Insert(0, new ScanLogItem
             {

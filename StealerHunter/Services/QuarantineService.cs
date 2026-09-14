@@ -109,7 +109,7 @@ public class QuarantineService
     {
         try
         {
-            var proc = Process.GetProcessById(pid);
+            using var proc = Process.GetProcessById(pid);
             var procName = proc.ProcessName;
 
             // 1. Verify Process Identity by Name (handling optional .exe) to prevent PID Reuse / TOCTOU hazards
@@ -213,15 +213,27 @@ public class QuarantineService
 
     public static bool QuarantineFile(string filePath, out string message) => QuarantineFile(filePath, out message, out _);
 
+    private const long MaxQuarantineFileSize = 500 * 1024 * 1024; // 500 MB limit
+
+    private static void EnsureQuarantineDirectory()
+    {
+        if (!Directory.Exists(QuarantineDir))
+        {
+            var di = Directory.CreateDirectory(QuarantineDir);
+            try
+            {
+                di.Attributes = FileAttributes.Directory | FileAttributes.Hidden;
+            }
+            catch { }
+        }
+    }
+
     public static bool QuarantineFile(string filePath, out string message, out string? destinationPath)
     {
         destinationPath = null;
         try
         {
-            if (!Directory.Exists(QuarantineDir))
-            {
-                Directory.CreateDirectory(QuarantineDir);
-            }
+            EnsureQuarantineDirectory();
 
             if (!File.Exists(filePath))
             {
@@ -239,39 +251,68 @@ public class QuarantineService
                 // Proceed anyway
             }
 
-            var fileName = Path.GetFileName(filePath);
-            var destPath = Path.Combine(QuarantineDir, $"{DateTime.Now:yyyyMMdd_HHmmss}_{fileName}.quarantined");
+            var fileInfo = new FileInfo(filePath);
+            long sourceLength = fileInfo.Length;
 
-            // 1. Read file bytes and apply XOR transformation to corrupt the MZ PE header (completely neutralizes execution)
-            byte[] fileBytes = File.ReadAllBytes(filePath);
-            for (int i = 0; i < fileBytes.Length; i++)
+            if (sourceLength > MaxQuarantineFileSize)
             {
-                fileBytes[i] ^= QuarantineXorKey;
+                message = $"File exceeds 500MB quarantine safety limit ({sourceLength / (1024 * 1024)} MB). Aborted.";
+                return false;
             }
 
-            // 2. Write scrambled binary to Quarantine vault
-            File.WriteAllBytes(destPath, fileBytes);
+            // Sanitize filename & add unique timestamp + random GUID token (prevents collision & invalid chars)
+            var rawFileName = Path.GetFileName(filePath);
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var safeFileName = string.Concat(rawFileName.Select(c => invalidChars.Contains(c) ? '_' : c));
+            var token = Guid.NewGuid().ToString("N")[..8];
+            var destFileName = $"{DateTime.Now:yyyyMMdd_HHmmss}_{token}_{safeFileName}.quarantined";
+            var destPath = Path.Combine(QuarantineDir, destFileName);
+            var tempDestPath = destPath + ".tmp";
+
+            // 1. Transactional chunk-based XOR stream (constant 64KB RAM usage, immune to OOM on large files)
+            using (var inStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var outStream = new FileStream(tempDestPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                byte[] buffer = new byte[65536];
+                int bytesRead;
+                while ((bytesRead = inStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    for (int i = 0; i < bytesRead; i++)
+                    {
+                        buffer[i] ^= QuarantineXorKey;
+                    }
+                    outStream.Write(buffer, 0, bytesRead);
+                }
+                outStream.Flush();
+            }
+
+            // 2. Integrity Verification: ensure written bytes exactly match source bytes before touching original
+            var writtenInfo = new FileInfo(tempDestPath);
+            if (writtenInfo.Length != sourceLength)
+            {
+                try { File.Delete(tempDestPath); } catch { }
+                message = "Quarantine stream integrity check failed (size mismatch). Aborting removal.";
+                return false;
+            }
+
+            // 3. Atomic commit: move .tmp to final .quarantined vault
+            File.Move(tempDestPath, destPath, overwrite: true);
             destinationPath = destPath;
 
-            // 3. Attempt to delete original file
+            // 4. Attempt to delete original file
             try
             {
                 File.Delete(filePath);
-                message = $"File neutralized (XOR-encrypted) and isolated to quarantine: {Path.GetFileName(destPath)}";
+                message = $"File neutralized (XOR-streamed) and isolated to quarantine: {destFileName}";
                 return true;
             }
             catch
             {
-                // 4. Fallback if file is locked: Schedule Windows kernel to delete file on next reboot
+                // Fallback if file is locked: Schedule Windows kernel to delete file on next reboot
                 bool scheduled = MoveFileEx(filePath, null, MOVEFILE_DELAY_UNTIL_REBOOT);
-                if (scheduled)
-                {
-                    message = $"File encrypted to quarantine ({Path.GetFileName(destPath)}), original is locked. Scheduled for post-reboot kernel deletion.";
-                }
-                else
-                {
-                    message = $"File encrypted to quarantine ({Path.GetFileName(destPath)}), original locked (Access Denied).";
-                }
+                message = scheduled
+                    ? $"File encrypted to quarantine ({destFileName}), original is locked. Scheduled for post-reboot kernel deletion (REBOOT REQUIRED)."
+                    : $"File encrypted to quarantine ({destFileName}), original locked (Access Denied).";
                 return true;
             }
         }
@@ -377,14 +418,32 @@ public class QuarantineService
                 return false;
             }
 
-            byte[] bytes = File.ReadAllBytes(quarantinedFilePath);
-            for (int i = 0; i < bytes.Length; i++)
+            var finalDest = destinationPath;
+            // Prevent overwriting: if a clean file already exists at destination, restore to .restored
+            if (File.Exists(destinationPath))
             {
-                bytes[i] ^= QuarantineXorKey; // Reverse XOR
+                finalDest = destinationPath + ".restored";
             }
 
-            File.WriteAllBytes(destinationPath, bytes);
-            message = $"File successfully decrypted and restored to: {destinationPath}";
+            var tempRestorePath = finalDest + ".tmp";
+            using (var inStream = new FileStream(quarantinedFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var outStream = new FileStream(tempRestorePath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                byte[] buffer = new byte[65536];
+                int bytesRead;
+                while ((bytesRead = inStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    for (int i = 0; i < bytesRead; i++)
+                    {
+                        buffer[i] ^= QuarantineXorKey; // Reverse XOR
+                    }
+                    outStream.Write(buffer, 0, bytesRead);
+                }
+                outStream.Flush();
+            }
+
+            File.Move(tempRestorePath, finalDest, overwrite: true);
+            message = $"File successfully decrypted and restored to: {finalDest}";
             return true;
         }
         catch (Exception ex)

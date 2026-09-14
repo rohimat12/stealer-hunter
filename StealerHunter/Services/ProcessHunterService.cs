@@ -33,9 +33,11 @@ public class ProcessHunterService
         var runningProcesses = Process.GetProcesses();
         foreach (var proc in runningProcesses)
         {
-            try
+            using (proc)
             {
-                if (proc.Id == currentPid || proc.Id <= 4) continue;
+                try
+                {
+                    if (proc.Id == currentPid || proc.Id <= 4) continue;
 
                 string? exePath = null;
                 DateTime? startTime = null;
@@ -287,6 +289,7 @@ public class ProcessHunterService
             catch
             {
                 // Process may have exited during scan
+            }
             }
         }
 
