@@ -22,15 +22,24 @@ public class QuarantineService
 
     public static string GetQuarantineDirectory() => QuarantineDir;
 
+    public static bool IsProtectedBrowserCredentialFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        var fileName = Path.GetFileName(path).ToLowerInvariant();
+        return fileName is "login data" or "login data-journal" or "cookies" or "cookies-journal"
+                         or "web data" or "web data-journal" or "local state" or "places.sqlite"
+                         or "key4.db" or "logins.json" or "formhistory.sqlite";
+    }
+
     public bool NeutralizeThreat(ThreatItem threat, out string resultMessage)
     {
         bool success = true;
         var messages = new List<string>();
 
-        // 1. If there's an active Process ID, terminate it first
+        // 1. If there's an active Process ID, terminate it with process identity verification
         if (threat.ProcessId.HasValue && threat.ProcessId.Value > 0)
         {
-            if (KillProcess(threat.ProcessId.Value, out var killMsg))
+            if (KillProcess(threat.ProcessId.Value, threat.ProcessName, threat.FilePath, out var killMsg))
             {
                 messages.Add(killMsg);
             }
@@ -57,10 +66,16 @@ public class QuarantineService
         // 3. If it's an executable file or staged dump file/folder on disk
         if (!string.IsNullOrEmpty(threat.FilePath) && !threat.FilePath.Contains("->"))
         {
-            if (File.Exists(threat.FilePath))
+            // CRITICAL HARD SAFEGUARD: NEVER delete or quarantine legitimate browser credential databases!
+            if (threat.Category == ThreatCategory.BrowserDataLock || IsProtectedBrowserCredentialFile(threat.FilePath))
             {
-                if (QuarantineFile(threat.FilePath, out var qMsg))
+                messages.Add($"Protected credential vault '{Path.GetFileName(threat.FilePath)}' was preserved safely. Terminate rogue holding processes to clear lock.");
+            }
+            else if (File.Exists(threat.FilePath))
+            {
+                if (QuarantineFile(threat.FilePath, out var qMsg, out var quarantinedPath))
                 {
+                    threat.QuarantineBackupPath = quarantinedPath;
                     messages.Add(qMsg);
                 }
                 else
@@ -89,12 +104,30 @@ public class QuarantineService
         return success;
     }
 
-    public static bool KillProcess(int pid, out string message)
+    public static bool KillProcess(int pid, string? expectedName, string? expectedPath, out string message)
     {
         try
         {
             var proc = Process.GetProcessById(pid);
             var procName = proc.ProcessName;
+
+            // 1. Verify Process Identity to prevent PID Reuse / TOCTOU hazards
+            if (!string.IsNullOrEmpty(expectedName) &&
+                !procName.Equals(expectedName, StringComparison.OrdinalIgnoreCase))
+            {
+                message = $"Target PID {pid} was reassigned by Windows to '{procName}' (expected '{expectedName}'). Termination aborted for system safety.";
+                return false;
+            }
+
+            // 2. Critical Windows System Process Safeguard
+            var lowerName = procName.ToLowerInvariant();
+            if (lowerName is "system" or "smss" or "csrss" or "wininit" or "services" or "lsass" or "winlogon" or "dwm")
+            {
+                message = $"Refusing to terminate critical system process '{procName}' (PID {pid}) to avoid system crash.";
+                return false;
+            }
+
+            // 3. Terminate process safely
             proc.Kill(entireProcessTree: true);
             message = $"Terminated process '{procName}' (PID {pid})";
             return true;
@@ -111,8 +144,13 @@ public class QuarantineService
         }
     }
 
-    public static bool QuarantineFile(string filePath, out string message)
+    public static bool KillProcess(int pid, out string message) => KillProcess(pid, null, null, out message);
+
+    public static bool QuarantineFile(string filePath, out string message) => QuarantineFile(filePath, out message, out _);
+
+    public static bool QuarantineFile(string filePath, out string message, out string? destinationPath)
     {
+        destinationPath = null;
         try
         {
             if (!Directory.Exists(QuarantineDir))
@@ -148,6 +186,7 @@ public class QuarantineService
 
             // 2. Write scrambled binary to Quarantine vault
             File.WriteAllBytes(destPath, fileBytes);
+            destinationPath = destPath;
 
             // 3. Attempt to delete original file
             try

@@ -48,42 +48,33 @@ public class StagedDataHunter
                     continue;
                 }
 
-                // Check directory name or contents
-                if (IsStagingFolderName(dirName))
-                {
-                    var threat = new ThreatItem
-                    {
-                        Name = $"Staged Credential Dump Folder: {dirName}",
-                        Category = ThreatCategory.StagedExfiltrationData,
-                        Severity = ThreatSeverity.Critical,
-                        Description = $"Folder contains naming patterns typical of Infostealer exfiltration dumps: '{dir}'",
-                        FilePath = dir,
-                        TargetTarget = "Staged Browser/Wallet Dumps"
-                    };
-                    threats.Add(threat);
-                    logCallback?.Invoke("DANGER", $"[CRITICAL] Staged dump folder found: {dir}");
-                    continue;
-                }
-
-                // Check inside directory for stealer keywords
+                // Check inside directory for stealer keywords or high-entropy staging
                 try
                 {
                     var files = Directory.GetFiles(dir);
                     int matchCount = 0;
+                    bool hasHighEntropyDump = false;
+
                     foreach (var file in files)
                     {
                         var fn = Path.GetFileName(file);
                         if (StealerDumpKeywords.Contains(fn)) matchCount++;
+
+                        if (EntropyHelper.IsSuspiciousHighEntropyStaging(file, out _))
+                        {
+                            hasHighEntropyDump = true;
+                        }
                     }
 
-                    if (matchCount >= 2)
+                    // Only flag if folder name matches AND contains at least 1 dump file, OR contains 2+ confirmed dump files
+                    if ((IsStagingFolderName(dirName) && (matchCount >= 1 || hasHighEntropyDump)) || matchCount >= 2)
                     {
                         var threat = new ThreatItem
                         {
-                            Name = $"Infostealer Staging Directory ({matchCount} dump files)",
+                            Name = $"Infostealer Staging Directory: {dirName}",
                             Category = ThreatCategory.StagedExfiltrationData,
                             Severity = ThreatSeverity.Critical,
-                            Description = $"Directory '{dir}' contains {matchCount} files typically dumped by infostealers (passwords, cookies, system info)!",
+                            Description = $"Directory '{dir}' contains confirmed stealer artifacts ({matchCount} dump files, encrypted payload: {hasHighEntropyDump})!",
                             FilePath = dir,
                             TargetTarget = "Harvested Passwords & Cookies"
                         };

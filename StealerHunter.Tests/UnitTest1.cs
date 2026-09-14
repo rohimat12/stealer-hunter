@@ -144,25 +144,56 @@ public class SecurityServicesTests
     }
 
     [TestMethod]
-    public void TestExecuteRealQuarantine()
+    public void TestQuarantineServiceSafeIsolationAndRestore()
     {
-        var persistenceService = new PersistenceService();
         var quarantineService = new QuarantineService();
-        var logs = new List<string>();
+        var tempFolder = Path.Combine(Path.GetTempPath(), "StealerHunter_Test_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempFolder);
 
-        var threats = persistenceService.ScanPersistence((lvl, msg) => logs.Add($"[{lvl}] {msg}"));
-
-        Console.WriteLine($"Found {threats.Count} persistence threats:");
-        foreach (var threat in threats)
+        try
         {
-            Console.WriteLine($"- Threat: {threat.Name} | Path: {threat.FilePath}");
-            var success = quarantineService.NeutralizeThreat(threat, out var resultMsg);
-            Console.WriteLine($"  Remediation Result: {(success ? "SUCCESS" : "FAILED")} - {resultMsg}");
+            // 1. Test Quarantine and XOR encryption on mock dummy file
+            var dummyFile = Path.Combine(tempFolder, "dummy_malware.exe");
+            byte[] mockBytes = { 0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00 }; // Standard MZ header
+            File.WriteAllBytes(dummyFile, mockBytes);
+
+            bool qResult = QuarantineService.QuarantineFile(dummyFile, out var qMsg, out var quarantinedPath);
+            Assert.IsTrue(qResult, "QuarantineFile should succeed for mock file");
+            Assert.IsFalse(File.Exists(dummyFile), "Original file should be deleted");
+            Assert.IsNotNull(quarantinedPath);
+            Assert.IsTrue(File.Exists(quarantinedPath), "Quarantined file should exist in vault");
+
+            // Verify XOR encryption (0x4D ^ 0x5A = 0x17)
+            byte[] encryptedBytes = File.ReadAllBytes(quarantinedPath);
+            Assert.AreEqual((byte)(0x4D ^ 0x5A), encryptedBytes[0], "First byte must be XOR scrambled");
+
+            // 2. Test Safe Restoration
+            var restoredFile = Path.Combine(tempFolder, "restored_malware.exe");
+            bool restoreResult = QuarantineService.RestoreQuarantinedFile(quarantinedPath, restoredFile, out var rMsg);
+            Assert.IsTrue(restoreResult, "RestoreQuarantinedFile should succeed");
+            Assert.IsTrue(File.Exists(restoredFile), "Restored file must exist");
+            byte[] restoredBytes = File.ReadAllBytes(restoredFile);
+            CollectionAssert.AreEqual(mockBytes, restoredBytes, "Restored bytes must match original");
+
+            // 3. Test Browser Credential Safeguard (NEVER delete browser database)
+            var browserThreat = new ThreatItem
+            {
+                Name = "Suspicious Lock on Login Data",
+                Category = ThreatCategory.BrowserDataLock,
+                FilePath = Path.Combine(tempFolder, "Login Data")
+            };
+            File.WriteAllText(browserThreat.FilePath, "SQLite format 3 test");
+
+            bool neutralizeBrowser = quarantineService.NeutralizeThreat(browserThreat, out var bMsg);
+            Assert.IsTrue(neutralizeBrowser);
+            Assert.IsTrue(File.Exists(browserThreat.FilePath), "CRITICAL: Browser Login Data must NEVER be deleted or quarantined!");
         }
-
-        foreach (var log in logs)
+        finally
         {
-            Console.WriteLine(log);
+            if (Directory.Exists(tempFolder))
+            {
+                try { Directory.Delete(tempFolder, true); } catch { }
+            }
         }
     }
 

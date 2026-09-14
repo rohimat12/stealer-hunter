@@ -52,6 +52,7 @@ public class MainViewModel : INotifyPropertyChanged
         CancelScanCommand = new RelayCommand(CancelScan, () => IsScanning);
         NeutralizeAllCommand = new RelayCommand(NeutralizeAllThreats, () => DetectedThreats.Any(t => !t.IsResolved));
         NeutralizeThreatCommand = new RelayCommand(p => NeutralizeSingleThreat(p as ThreatItem));
+        RestoreThreatCommand = new RelayCommand(p => RestoreSingleThreat(p as ThreatItem));
         OpenQuarantineFolderCommand = new RelayCommand(OpenQuarantineFolder);
         ClearLogsCommand = new RelayCommand(() => ScanLogs.Clear());
         DismissAlertCommand = new RelayCommand(() => HasActiveThreatAlert = false);
@@ -88,6 +89,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand CancelScanCommand { get; }
     public ICommand NeutralizeAllCommand { get; }
     public ICommand NeutralizeThreatCommand { get; }
+    public ICommand RestoreThreatCommand { get; }
     public ICommand OpenQuarantineFolderCommand { get; }
     public ICommand ClearLogsCommand { get; }
     public ICommand DismissAlertCommand { get; }
@@ -182,6 +184,9 @@ public class MainViewModel : INotifyPropertyChanged
             {
                 _realtimeProtectionEnabled = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(RealtimeStatusText));
+                OnPropertyChanged(nameof(RealtimeStatusColor));
+
                 if (value)
                 {
                     _watcherService.Start();
@@ -197,6 +202,9 @@ public class MainViewModel : INotifyPropertyChanged
             }
         }
     }
+
+    public string RealtimeStatusText => RealtimeProtectionEnabled ? "SHIELD ON" : "SHIELD OFF";
+    public string RealtimeStatusColor => RealtimeProtectionEnabled ? "#00E676" : "#FF5252";
 
     public bool StartMinimizedToTray
     {
@@ -369,10 +377,20 @@ public class MainViewModel : INotifyPropertyChanged
             }
             else
             {
-                StatusTitle = "SYSTEM CLEAN & PROTECTED";
-                StatusSubtitle = "No active infostealers or compromised browser credential locks detected.";
-                StatusColor = "#00E676"; // Emerald Green
-                AddLog("SUCCESS", "Scan completed. No infostealer threats found.");
+                if (!_malwareDbService.IsDatabaseHealthy)
+                {
+                    StatusTitle = "SIGNATURE DATABASE EMPTY";
+                    StatusSubtitle = "No threats found via heuristics, but signature database is empty. Click 'Update DB'.";
+                    StatusColor = "#F4CE14"; // Amber
+                    AddLog("WARN", "Scan completed. Note: Threat database is empty or could not be loaded.");
+                }
+                else
+                {
+                    StatusTitle = "SYSTEM CLEAN & PROTECTED";
+                    StatusSubtitle = "No active infostealers or compromised browser credential locks detected.";
+                    StatusColor = "#00E676"; // Emerald Green
+                    AddLog("SUCCESS", "Scan completed. No infostealer threats found.");
+                }
             }
         }
         catch (OperationCanceledException)
@@ -434,12 +452,28 @@ public class MainViewModel : INotifyPropertyChanged
 
     public void NeutralizeAllThreats()
     {
-        AddLog("WARN", "Executing mass neutralization of all detected threats...");
         var unresolved = DetectedThreats.Where(t => !t.IsResolved).ToList();
+        if (unresolved.Count == 0) return;
+
+        var confirm = System.Windows.MessageBox.Show(
+            $"StealerHunter is about to neutralize {unresolved.Count} detected threat(s).\n\n" +
+            "This will terminate confirmed malware processes and isolate rogue files into the encrypted quarantine vault.\n\n" +
+            "Do you want to proceed?",
+            "Confirm Threat Remediation",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+
+        if (confirm != System.Windows.MessageBoxResult.Yes)
+        {
+            AddLog("INFO", "Mass neutralization cancelled by user.");
+            return;
+        }
+
+        AddLog("WARN", $"Executing mass neutralization of {unresolved.Count} threats...");
 
         foreach (var threat in unresolved)
         {
-            NeutralizeSingleThreat(threat);
+            NeutralizeSingleThreatInternal(threat);
         }
 
         OnPropertyChanged(nameof(ThreatsCount));
@@ -458,6 +492,20 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (threat == null || threat.IsResolved) return;
 
+        var confirm = System.Windows.MessageBox.Show(
+            $"Do you want to neutralize threat:\n\n'{threat.Name}'\nTarget: {threat.FilePath}?\n\n" +
+            "This will terminate the process and isolate the file into the encrypted quarantine vault.",
+            "Confirm Single Threat Remediation",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Question);
+
+        if (confirm != System.Windows.MessageBoxResult.Yes) return;
+
+        NeutralizeSingleThreatInternal(threat);
+    }
+
+    private void NeutralizeSingleThreatInternal(ThreatItem threat)
+    {
         AddLog("INFO", $"Neutralizing threat: {threat.Name}...");
         bool success = _quarantineService.NeutralizeThreat(threat, out var msg);
 
@@ -468,6 +516,37 @@ public class MainViewModel : INotifyPropertyChanged
         else
         {
             AddLog("DANGER", $"[FAILED] Could not fully neutralize {threat.Name}: {msg}");
+        }
+
+        OnPropertyChanged(nameof(ThreatsCount));
+        OnPropertyChanged(nameof(ResolvedCount));
+    }
+
+    public void RestoreSingleThreat(ThreatItem? threat)
+    {
+        if (threat == null || !threat.CanRestore || string.IsNullOrEmpty(threat.QuarantineBackupPath))
+            return;
+
+        var confirm = System.Windows.MessageBox.Show(
+            $"Are you sure you want to restore this file from quarantine?\n\nFile: {threat.FilePath}\n\n" +
+            "WARNING: If this file was a true malicious payload, restoring it will place the executable back onto your system!",
+            "Confirm Quarantine Restoration",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+
+        if (confirm != System.Windows.MessageBoxResult.Yes) return;
+
+        bool restored = QuarantineService.RestoreQuarantinedFile(threat.QuarantineBackupPath, threat.FilePath, out var msg);
+        if (restored)
+        {
+            threat.IsResolved = false;
+            threat.QuarantineBackupPath = null;
+            threat.StatusMessage = "Restored from Quarantine";
+            AddLog("SUCCESS", $"[RESTORED] {threat.Name}: {msg}");
+        }
+        else
+        {
+            AddLog("DANGER", $"[RESTORE FAILED] Could not restore {threat.Name}: {msg}");
         }
 
         OnPropertyChanged(nameof(ThreatsCount));
@@ -491,7 +570,7 @@ public class MainViewModel : INotifyPropertyChanged
 
     private void OnSuspiciousActivityDetected(string message, string path)
     {
-        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
         {
             AddLog("DANGER", $"[REALTIME ALERT] {message}");
             NotificationRequested?.Invoke("StealerHunter Realtime Guard", message);

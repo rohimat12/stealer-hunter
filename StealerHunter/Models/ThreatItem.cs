@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
 namespace StealerHunter.Models;
 
 public enum ThreatSeverity
@@ -18,8 +21,12 @@ public enum ThreatCategory
     KnownSignatureMatch
 }
 
-public class ThreatItem
+public class ThreatItem : INotifyPropertyChanged
 {
+    private bool _isResolved;
+    private string _statusMessage = "Active Threat";
+    private string? _quarantineBackupPath;
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public ThreatCategory Category { get; set; }
@@ -28,9 +35,51 @@ public class ThreatItem
     public string TargetTarget { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
     public int? ProcessId { get; set; }
+    public string? ProcessName { get; set; }
     public DateTime DetectedAt { get; set; } = DateTime.Now;
-    public bool IsResolved { get; set; }
-    public string StatusMessage { get; set; } = "Active Threat";
+
+    public bool IsResolved
+    {
+        get => _isResolved;
+        set
+        {
+            if (_isResolved != value)
+            {
+                _isResolved = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanRestore));
+            }
+        }
+    }
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        set
+        {
+            if (_statusMessage != value)
+            {
+                _statusMessage = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public string? QuarantineBackupPath
+    {
+        get => _quarantineBackupPath;
+        set
+        {
+            if (_quarantineBackupPath != value)
+            {
+                _quarantineBackupPath = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanRestore));
+            }
+        }
+    }
+
+    public bool CanRestore => IsResolved && !string.IsNullOrEmpty(QuarantineBackupPath);
 
     public string SeverityBadgeColor => Severity switch
     {
@@ -50,4 +99,11 @@ public class ThreatItem
         ThreatCategory.KnownSignatureMatch => "☣️",
         _ => "⚠️"
     };
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 }
