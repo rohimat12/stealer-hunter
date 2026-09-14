@@ -2,6 +2,8 @@
 
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://microsoft.com)
 [![Framework](https://img.shields.io/badge/Framework-.NET%208%20WPF-purple.svg)](https://dotnet.microsoft.com/)
+[![Version](https://img.shields.io/badge/Version-v1.1.0-cyan.svg)](#)
+[![Tests](https://img.shields.io/badge/Tests-19%2F19%20Passing-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Focus-Anti--Infostealer-red.svg)](#)
 [![Built With](https://img.shields.io/badge/Built%20With-AI%20Pair%20Programming-brightgreen.svg)](#)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#)
@@ -92,9 +94,11 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
    * Memeriksa entri autorun di Registry (`HKCU` & `HKLM` `Run` / `RunOnce`).
    * Memeriksa entri Task Scheduler dan Windows Startup dari skrip atau executable asing.
 
-6. **One-Click Neutralize & XOR-Encrypted Quarantine Vault**:
+6. **One-Click Neutralize & XOR-Encrypted Quarantine Vault (Transactional & Safe)**:
    * **Process Tree Termination**: Mematikan seluruh hierarki proses malware secara tuntas dalam satu ketukan.
-   * **XOR-Encrypted Vault (Key: 0x5A)**: Berkas biner malware dienkripsi byte-demi-byte saat dipindahkan ke folder karantina (`%APPDATA%\StealerHunter\Quarantine`). Hal ini merusak struktur *PE Header* (`MZ`) sehingga malware **lumpuh total, tidak bisa dieksekusi**, dan tidak lagi memicu alarm sekunder dari Windows Defender.
+   * **Streaming XOR-Encrypted Vault (Key: 0x5A)**: Berkas biner malware dienkripsi byte-demi-byte menggunakan chunk streaming 64 KB (aman dari *OutOfMemoryException* pada berkas besar). Hal ini merusak struktur *PE Header* (`MZ`) sehingga malware **lumpuh total, tidak bisa dieksekusi**, dan tidak memicu alarm sekunder.
+   * **Transactional Commit & Safeguard**: Penulisan karantina menggunakan file temporer `.tmp` dengan verifikasi integritas ukuran sebelum file asli dihapus. Dilengkapi safeguard kekebalan (*immunity*) untuk berkas database kredensial browser dan direktori kritis Windows (`System32`, `Windows`, `Program Files`).
+   * **Non-Destructive Restoration**: Pemulihan berkas karantina tidak pernah menimpa berkas yang ada, melainkan disimpan sebagai `.restored`.
    * **Kernel-Level Reboot Cleanup (`MoveFileEx`)**: Jika berkas malware terkunci (*file lock / access denied*) oleh proses sistem yang membandel, aplikasi otomatis mendaftarkannya ke kernel Windows (`MOVEFILE_DELAY_UNTIL_REBOOT`) untuk dimusnahkan seketika saat komputer melakukan *restart*.
    * **Pembersihan Registry Autorun**: Menghapus entri autorun dan service jahat dari registry secara bersih.
 
@@ -108,12 +112,21 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
    * **Live Threat DB Updater**: Fitur pembaruan daring (*Live Update*) sekali klik untuk mengunduh intelijen malware teranyar dari server siber.
    * **Memory & Directory Hash Matching**: Memvalidasi hash SHA-256 seluruh proses aktif dan direktori berisiko tinggi dengan pencarian instan O(1).
 
+9. **Deep NTFS MFT & USN Journal Hunter**:
+   * Membaca langsung struktur *Master File Table* (MFT) dan *USN Change Journal* pada drive NTFS untuk mendeteksi jejak dropper atau executable siluman yang mencoba menghapus diri atau bersembunyi di partisi sekunder.
+
+10. **Archive Deep Inspector (.zip, .rar, .7z)**:
+    * Menginspeksi konten dalam arsip terkompresi di folder rawan (`Downloads`, `Desktop`, `%TEMP%`) dengan perlindungan *zip-bomb* (batas ukuran 100 MB dan maksimal 5.000 berkas).
+
+11. **Real-Time Progress Percentage & State Guard**:
+    * Indikator persentase pemindaian real-time (0% s/d 100%) dengan sinkronisasi status tombol otomatis (tombol Stop hanya aktif saat scan berlangsung, tombol Quick & Deep scan terkunci untuk mencegah pemindaian ganda).
+
 ---
 
 ## 💻 Cara Menggunakan & Instalasi
 
 ### 1. Menggunakan File Installer (Rekomendasi Pengguna)
-Unduh file **`StealerHunter_Setup.exe`** dari menu [Releases](https://github.com/rohimat12/stealer-hunter/releases), jalankan installer, dan aplikasi siap melindungi sistem Anda.
+Unduh file installer mandiri **`StealerHunter_Setup_v1.1.0.exe`** (~50 MB, Full Standalone dengan .NET 8 Runtime) dari folder `installer_output` atau menu [Releases](https://github.com/rohimat12/stealer-hunter/releases), jalankan instalasi, dan aplikasi langsung aktif melindungi PC Anda.
 
 ### 2. Mode Darurat Tanpa GUI (Batch Script)
 Jika sistem Anda sedang dalam infeksi aktif dan butuh pembersihan cepat seketika:
@@ -130,7 +143,7 @@ dotnet run --project StealerHunter
 dotnet publish StealerHunter -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./dist
 ```
 
-### 5. Mem-build File Installer (Inno Setup):
+### 5. Mem-build File Installer Standalone (Inno Setup):
 Jalankan skrip pembangun:
 ```cmd
 BUILD_INSTALLER.bat
@@ -139,11 +152,11 @@ BUILD_INSTALLER.bat
 ---
 
 ## 🧪 Pengujian Unit (Unit Tests)
-Proyek ini dilengkapi pengujian otomatis (MSTest):
+Proyek ini dilengkapi pengujian otomatis yang komprehensif (MSTest) mencakup deteksi browser, validasi hash, pemburu proses, mitigasi overwrite, keamanan karantina, autorun ground-truth, hingga state UI:
 ```powershell
 dotnet test
 ```
-*Seluruh pengujian unit (7/7) terverifikasi sukses.*
+*Seluruh pengujian unit (**19/19**) terverifikasi lolos hijau (100% Passed).*
 
 ---
 
@@ -154,16 +167,18 @@ stealer-hunter/
 ├── StealerHunter.sln            # Visual Studio / .NET Solution
 ├── StealerHunter_Setup.iss      # Skrip Inno Setup Installer
 ├── BERSIHKAN_VIRUS.bat          # Skrip darurat pembersihan sistem
-├── BUILD_INSTALLER.bat          # Otomasi kompilasi installer
+├── BUILD_INSTALLER.bat          # Otomasi kompilasi installer standalone
 ├── README.md                    # Dokumentasi proyek
 ├── StealerHunter/               # Proyek Aplikasi Utama (C# WPF .NET 8)
 │   ├── Models/                  # ThreatItem, BrowserTarget, ScanLogItem, AppSettings
-│   ├── Services/                # BrowserAudit, ProcessHunter, Persistence, Quarantine, AutoStartup, RealtimeWatcher, SystemTray, MalwareDatabase
+│   ├── Services/                # BrowserAudit, ProcessHunter, Persistence, Quarantine, AutoStartup,
+│   │                            # RealtimeWatcher, SystemTray, MalwareDatabase, MftDeepScanService,
+│   │                            # ArchiveScannerService, StagedDataHunter
 │   ├── ViewModels/              # MainViewModel, RelayCommand, ValueConverters
 │   ├── Resources/               # Styles.xaml (Modern Cyber Dark Theme), malware_db.json (Abuse.ch DB)
 │   ├── MainWindow.xaml/.cs      # Tampilan UI Dashboard & Tray Integration
 │   └── App.xaml/.cs             # Konfigurasi Aplikasi & Resource Dictionary
-└── StealerHunter.Tests/         # Proyek Unit Test (MSTest)
+└── StealerHunter.Tests/         # Proyek Unit Test (MSTest - 19 Pengujian Otomatis)
 ```
 
 ---
