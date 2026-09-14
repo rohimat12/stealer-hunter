@@ -8,6 +8,50 @@
 
 **StealerHunter** adalah aplikasi desktop keamanan modern berbasis **C# (.NET 8 WPF)** yang dirancang khusus untuk memburu, menghentikan, dan membersihkan malware pencuri kata sandi (**Infostealer**) seperti **Lumma Stealer, RedLine, Stealc, Vidar, dan Raccoon**, serta mengamankan basis data kredensial dan *session cookies* peramban (browser).
 
+<p align="center">
+  <img src="docs/screenshots/01_dashboard.png" alt="StealerHunter Scanner &amp; Dashboard" width="900">
+</p>
+
+---
+
+## 📸 Antarmuka Aplikasi (User Interface)
+
+<details open>
+<summary><b>Klik untuk melihat pratinjau lengkap antarmuka StealerHunter</b></summary>
+<br/>
+
+### 1. 🛡️ Scanner & Dashboard Utama
+Ringkasan status pertahanan real-time, lencana signature intelijen Abuse.ch MalwareBazaar, status peramban terproteksi, serta kontrol pemindaian cepat (*Quick Scan*) dan mendalam (*Deep Scan*).
+<p align="center">
+  <img src="docs/screenshots/01_dashboard.png" alt="Scanner &amp; Dashboard" width="850">
+</p>
+
+### 2. 🌐 Browser Vault Integrity Shield
+Pemantauan dan perlindungan integritas berkas kredensial (*Login Data, Cookies, Web Data, Local State*) untuk Google Chrome, Microsoft Edge, Brave, Opera Stable, dan Opera GX.
+<p align="center">
+  <img src="docs/screenshots/02_browser_shields.png" alt="Browser Shields" width="850">
+</p>
+
+### 3. 📜 Telemetri & Live Logs
+Log pemindaian real-time memantau status pemuatan database hash dan aktivitas latar belakang sistem.
+<p align="center">
+  <img src="docs/screenshots/03_live_logs.png" alt="Live Logs" width="850">
+</p>
+
+### 4. 🚨 Emergency Security Checklist
+Panduan tindakan darurat pasca-infeksi: pencabutan sesi web aktif (*Revoke Google/Microsoft sessions*), pergantian master email password, aktivasi 2FA, dan isolasi crypto wallet.
+<p align="center">
+  <img src="docs/screenshots/04_emergency_checklist.png" alt="Emergency Checklist" width="850">
+</p>
+
+### 5. ⚙️ Settings & Auto-Start Configuration
+Pengaturan integrasi sistem Windows: pendaftaran autorun saat booting (dengan mode *silent*), minimize ke system tray pojok kanan bawah, dan watcher folder `%TEMP%`.
+<p align="center">
+  <img src="docs/screenshots/05_settings.png" alt="Settings &amp; Auto-Start" width="850">
+</p>
+
+</details>
+
 ---
 
 ## 🎯 Mengapa Dikhususkan untuk Infostealer?
