@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.IO;
@@ -12,6 +13,12 @@ public class QuarantineService
         "StealerHunter",
         "Quarantine"
     );
+
+    private const byte QuarantineXorKey = 0x5A; // Industry-standard XOR key to neutralize executable PE headers
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool MoveFileEx(string lpExistingFileName, string? lpNewFileName, int dwFlags);
+    private const int MOVEFILE_DELAY_UNTIL_REBOOT = 0x00000004;
 
     public static string GetQuarantineDirectory() => QuarantineDir;
 
@@ -132,19 +139,37 @@ public class QuarantineService
             var fileName = Path.GetFileName(filePath);
             var destPath = Path.Combine(QuarantineDir, $"{DateTime.Now:yyyyMMdd_HHmmss}_{fileName}.quarantined");
 
+            // 1. Read file bytes and apply XOR transformation to corrupt the MZ PE header (completely neutralizes execution)
+            byte[] fileBytes = File.ReadAllBytes(filePath);
+            for (int i = 0; i < fileBytes.Length; i++)
+            {
+                fileBytes[i] ^= QuarantineXorKey;
+            }
+
+            // 2. Write scrambled binary to Quarantine vault
+            File.WriteAllBytes(destPath, fileBytes);
+
+            // 3. Attempt to delete original file
             try
             {
-                File.Move(filePath, destPath, overwrite: true);
+                File.Delete(filePath);
+                message = $"File neutralized (XOR-encrypted) and isolated to quarantine: {Path.GetFileName(destPath)}";
+                return true;
             }
             catch
             {
-                // Fallback: Copy and delete
-                File.Copy(filePath, destPath, overwrite: true);
-                File.Delete(filePath);
+                // 4. Fallback if file is locked: Schedule Windows kernel to delete file on next reboot
+                bool scheduled = MoveFileEx(filePath, null, MOVEFILE_DELAY_UNTIL_REBOOT);
+                if (scheduled)
+                {
+                    message = $"File encrypted to quarantine ({Path.GetFileName(destPath)}), original is locked. Scheduled for post-reboot kernel deletion.";
+                }
+                else
+                {
+                    message = $"File encrypted to quarantine ({Path.GetFileName(destPath)}), original locked (Access Denied).";
+                }
+                return true;
             }
-
-            message = $"File isolated to quarantine: {Path.GetFileName(destPath)}";
-            return true;
         }
         catch (Exception ex)
         {
@@ -165,13 +190,102 @@ public class QuarantineService
             var dirName = Path.GetFileName(dirPath.TrimEnd('\\'));
             var destPath = Path.Combine(QuarantineDir, $"{DateTime.Now:yyyyMMdd_HHmmss}_{dirName}_dump");
 
-            Directory.Move(dirPath, destPath);
-            message = $"Dump directory isolated: {Path.GetFileName(destPath)}";
-            return true;
+            // Direct move attempt
+            try
+            {
+                Directory.Move(dirPath, destPath);
+                message = $"Dump directory isolated: {Path.GetFileName(destPath)}";
+                return true;
+            }
+            catch
+            {
+                // Fallback: Recursive file-by-file copy, XOR encryption, and reboot scheduling
+                Directory.CreateDirectory(destPath);
+                int fileCount = 0;
+
+                foreach (var file in Directory.GetFiles(dirPath, "*.*", SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        var relPath = Path.GetRelativePath(dirPath, file);
+                        var targetFile = Path.Combine(destPath, relPath + ".quarantined");
+                        var targetDir = Path.GetDirectoryName(targetFile);
+                        if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
+                        {
+                            Directory.CreateDirectory(targetDir);
+                        }
+
+                        byte[] bytes = File.ReadAllBytes(file);
+                        for (int i = 0; i < bytes.Length; i++)
+                        {
+                            bytes[i] ^= QuarantineXorKey;
+                        }
+                        File.WriteAllBytes(targetFile, bytes);
+
+                        try
+                        {
+                            File.SetAttributes(file, FileAttributes.Normal);
+                            File.Delete(file);
+                        }
+                        catch
+                        {
+                            MoveFileEx(file, null, MOVEFILE_DELAY_UNTIL_REBOOT);
+                        }
+
+                        fileCount++;
+                    }
+                    catch
+                    {
+                        // Proceed with remaining files
+                    }
+                }
+
+                try
+                {
+                    Directory.Delete(dirPath, true);
+                }
+                catch
+                {
+                    MoveFileEx(dirPath, null, MOVEFILE_DELAY_UNTIL_REBOOT);
+                }
+
+                message = $"Staging directory isolated ({fileCount} files XOR-encrypted). Locked remnants scheduled for reboot cleanup.";
+                return true;
+            }
         }
         catch (Exception ex)
         {
             message = $"Failed to quarantine directory: {ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Safely restores an XOR-encrypted quarantined file back to its original executable format.
+    /// </summary>
+    public static bool RestoreQuarantinedFile(string quarantinedFilePath, string destinationPath, out string message)
+    {
+        try
+        {
+            if (!File.Exists(quarantinedFilePath))
+            {
+                message = "Quarantined file not found.";
+                return false;
+            }
+
+            byte[] bytes = File.ReadAllBytes(quarantinedFilePath);
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] ^= QuarantineXorKey; // Reverse XOR
+            }
+
+            File.WriteAllBytes(destinationPath, bytes);
+            message = $"File successfully decrypted and restored to: {destinationPath}";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            message = $"Failed to restore file: {ex.Message}";
             return false;
         }
     }

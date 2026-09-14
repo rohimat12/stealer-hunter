@@ -92,10 +92,11 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
    * Memeriksa entri autorun di Registry (`HKCU` & `HKLM` `Run` / `RunOnce`).
    * Memeriksa entri Task Scheduler dan Windows Startup dari skrip atau executable asing.
 
-6. **One-Click Neutralize & Quarantine**:
-   * Mematikan seluruh pohon proses malware seketika (*Process Tree Termination*).
-   * Mengisolasi file berbahaya ke folder karantina aman (`%APPDATA%\StealerHunter\Quarantine`).
-   * Menghapus entri autorun dan service jahat dari registry secara bersih.
+6. **One-Click Neutralize & XOR-Encrypted Quarantine Vault**:
+   * **Process Tree Termination**: Mematikan seluruh hierarki proses malware secara tuntas dalam satu ketukan.
+   * **XOR-Encrypted Vault (Key: 0x5A)**: Berkas biner malware dienkripsi byte-demi-byte saat dipindahkan ke folder karantina (`%APPDATA%\StealerHunter\Quarantine`). Hal ini merusak struktur *PE Header* (`MZ`) sehingga malware **lumpuh total, tidak bisa dieksekusi**, dan tidak lagi memicu alarm sekunder dari Windows Defender.
+   * **Kernel-Level Reboot Cleanup (`MoveFileEx`)**: Jika berkas malware terkunci (*file lock / access denied*) oleh proses sistem yang membandel, aplikasi otomatis mendaftarkannya ke kernel Windows (`MOVEFILE_DELAY_UNTIL_REBOOT`) untuk dimusnahkan seketika saat komputer melakukan *restart*.
+   * **Pembersihan Registry Autorun**: Menghapus entri autorun dan service jahat dari registry secara bersih.
 
 7. **Emergency Security Checklist**:
    * Panduan langkah darurat pasca-infeksi: pencabutan sesi web aktif (*Revoke Google/Microsoft sessions*), pergantian password master email, aktivasi 2FA aplikasi, dan pengamanan aset digital.
