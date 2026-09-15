@@ -131,7 +131,7 @@ public class StagedDataHunter
                     try
                     {
                         var fi = new FileInfo(candidate);
-                        if (fi.Length is >= 512 and <= 20_000_000 && (now - fi.LastWriteTime).TotalDays <= 7)
+                        if (fi.Length is >= 1_024 and <= 4_000_000 && (now - fi.LastWriteTime).TotalDays <= 7)
                         {
                             if (EntropyHelper.IsSuspiciousHighEntropyStaging(candidate, out var entropy))
                             {

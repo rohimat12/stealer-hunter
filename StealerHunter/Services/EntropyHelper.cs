@@ -143,10 +143,21 @@ public static class EntropyHelper
         if (header[0] == 0x49 && header[1] == 0x44 && header[2] == 0x33)
             return true;
 
-        // Fonts (WOFF, WOFF2, OpenType)
-        if (header[0] == 0x77 && header[1] == 0x4F && header[2] == 0x46 && (header[3] == 0x46 || header[3] == 0x32))
+        // Zero-padded structured binary headers (memory index tables, sparse headers)
+        if (header.Length >= 8 && header[0] == 0 && header[1] == 0 && header[2] == 0 && header[3] == 0 &&
+            header[4] == 0 && header[5] == 0 && header[6] == 0 && header[7] == 0)
             return true;
-        if (header[0] == 0x4F && header[1] == 0x54 && header[2] == 0x54 && header[3] == 0x4F)
+
+        // DirectX Shader Bytecode (DXBC)
+        if (header[0] == 0x44 && header[1] == 0x58 && header[2] == 0x42 && header[3] == 0x43)
+            return true;
+
+        // V8 / Chromium Snapshot ("v8")
+        if (header[0] == 0x76 && header[1] == 0x38)
+            return true;
+
+        // Windows Executable / DLL (MZ header - handled by PE/Process scanner, not staging dump)
+        if (header[0] == 0x4D && header[1] == 0x5A)
             return true;
 
         return false;
