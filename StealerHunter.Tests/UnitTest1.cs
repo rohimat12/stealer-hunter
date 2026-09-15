@@ -586,4 +586,58 @@ public class SecurityServicesTests
             }
         }
     }
+
+    [TestMethod]
+    public void TestEntropyStagingExcludesLegitimateMediaAndDetectsRawPayloads()
+    {
+        var tempFolder = Path.Combine(Path.GetTempPath(), "SH_EntropyTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempFolder);
+
+        try
+        {
+            // 1. Create a fake PNG image file in temp (high entropy due to compression, but standard magic header)
+            var fakePng = Path.Combine(tempFolder, "cache_image.tmp");
+            var pngBytes = new byte[2048];
+            new Random(42).NextBytes(pngBytes); // Random high entropy
+            // Write PNG Magic Header
+            byte[] pngHeader = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+            Array.Copy(pngHeader, 0, pngBytes, 0, pngHeader.Length);
+            File.WriteAllBytes(fakePng, pngBytes);
+
+            bool pngFlagged = StealerHunter.Services.EntropyHelper.IsSuspiciousHighEntropyStaging(fakePng, out var pngEntropy);
+            Assert.IsFalse(pngFlagged, "Legitimate PNG header must NEVER be flagged as suspicious staging dump");
+
+            // 2. Create a fake JPEG image file in temp
+            var fakeJpg = Path.Combine(tempFolder, "photo_cache.tmp");
+            var jpgBytes = new byte[2048];
+            new Random(43).NextBytes(jpgBytes);
+            // Write JPEG Magic Header
+            byte[] jpgHeader = { 0xFF, 0xD8, 0xFF, 0xE0 };
+            Array.Copy(jpgHeader, 0, jpgBytes, 0, jpgHeader.Length);
+            File.WriteAllBytes(fakeJpg, jpgBytes);
+
+            bool jpgFlagged = StealerHunter.Services.EntropyHelper.IsSuspiciousHighEntropyStaging(fakeJpg, out _);
+            Assert.IsFalse(jpgFlagged, "Legitimate JPEG header must NEVER be flagged as suspicious staging dump");
+
+            // 3. Create a RAW high-entropy encrypted dump without standard headers (actual Lumma/Stealc obfuscated log)
+            var rawMalwareDump = Path.Combine(tempFolder, "staged_dump.tmp");
+            var rawDumpBytes = new byte[2048];
+            new Random(44).NextBytes(rawDumpBytes); // Pure random raw bytes
+            // Ensure first byte isn't a known header
+            rawDumpBytes[0] = 0xAA;
+            rawDumpBytes[1] = 0xBB;
+            File.WriteAllBytes(rawMalwareDump, rawDumpBytes);
+
+            bool rawFlagged = StealerHunter.Services.EntropyHelper.IsSuspiciousHighEntropyStaging(rawMalwareDump, out var rawEntropy);
+            Assert.IsTrue(rawFlagged, "Raw high-entropy encrypted buffer without standard headers MUST be flagged");
+            Assert.IsTrue(rawEntropy >= 7.25, $"Calculated entropy ({rawEntropy}) should exceed threshold");
+        }
+        finally
+        {
+            if (Directory.Exists(tempFolder))
+            {
+                try { Directory.Delete(tempFolder, true); } catch { }
+            }
+        }
+    }
 }
