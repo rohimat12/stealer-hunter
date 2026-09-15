@@ -489,7 +489,7 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (items.Count == 0) return;
 
-        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        void AddAction()
         {
             var newlyAdded = new List<ThreatItem>();
             foreach (var item in items)
@@ -520,7 +520,17 @@ public class MainViewModel : INotifyPropertyChanged
                 TriggerThreatAlert($"{newlyAdded.Count} Threats Intercepted",
                     $"{newlyAdded.Count} active security threats were detected and require attention.");
             }
-        });
+        }
+
+        if (System.Windows.Application.Current?.Dispatcher != null &&
+            !System.Windows.Application.Current.Dispatcher.CheckAccess())
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(AddAction);
+        }
+        else
+        {
+            AddAction();
+        }
     }
 
     public async void NeutralizeAllThreats()
@@ -878,7 +888,7 @@ public class MainViewModel : INotifyPropertyChanged
 
     private void OnSuspiciousActivityDetected(string message, string path)
     {
-        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+        void Action()
         {
             AddLog("DANGER", $"[REALTIME ALERT] {message}");
             NotificationRequested?.Invoke("StealerHunter Realtime Guard", message);
@@ -902,12 +912,22 @@ public class MainViewModel : INotifyPropertyChanged
             StatusColor = "#FF2E63";
 
             TriggerThreatAlert("Realtime File Staging Alert", message);
-        });
+        }
+
+        if (System.Windows.Application.Current?.Dispatcher != null &&
+            !System.Windows.Application.Current.Dispatcher.CheckAccess())
+        {
+            System.Windows.Application.Current.Dispatcher.BeginInvoke(Action);
+        }
+        else
+        {
+            Action();
+        }
     }
 
     public void AddLog(string level, string message)
     {
-        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+        void Action()
         {
             ScanLogs.Insert(0, new ScanLogItem
             {
@@ -920,7 +940,17 @@ public class MainViewModel : INotifyPropertyChanged
             {
                 ScanLogs.RemoveAt(ScanLogs.Count - 1);
             }
-        });
+        }
+
+        if (System.Windows.Application.Current?.Dispatcher != null &&
+            !System.Windows.Application.Current.Dispatcher.CheckAccess())
+        {
+            System.Windows.Application.Current.Dispatcher.BeginInvoke(Action);
+        }
+        else
+        {
+            Action();
+        }
     }
 
     public async Task UpdateDatabaseAsync()
