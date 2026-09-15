@@ -640,4 +640,105 @@ public class SecurityServicesTests
             }
         }
     }
+
+    [TestMethod]
+    public void GenerateAppScreenshots()
+    {
+        Exception? threadException = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (System.Windows.Application.Current == null)
+                {
+                    _ = new System.Windows.Application();
+                }
+
+                var window = new MainWindow();
+                var vm = (StealerHunter.ViewModels.MainViewModel)window.DataContext;
+
+                // Setup realistic and clean data for showcase
+                vm.AddLog("INFO", "StealerHunter initialized. Loaded 250,000+ Abuse.ch threat signatures.");
+                vm.AddLog("INFO", "Realtime Watcher active on %TEMP% & Staging directories.");
+                vm.AddLog("INFO", "Auto-Start on Boot is currently ENABLED (High-Privilege Scheduled Task).");
+                vm.AddLog("INFO", "System Tray Guardian active with background resident protection.");
+                vm.AddLog("WARN", "High-entropy staging dump detected in temp directory.");
+                vm.AddLog("SUCCESS", "Threats isolated and safely stored in Quarantine Vault.");
+
+                // Populate Quarantine Vault sample items
+                vm.QuarantinedItems.Clear();
+                vm.QuarantinedItems.Add(new QuarantinedItem
+                {
+                    OriginalFileName = "Lumma_v4_Dropper.exe",
+                    QuarantinedFileName = "Lumma_v4_Dropper.exe_20260915_160000.quarantined",
+                    FullPath = @"C:\Users\User\AppData\Roaming\StealerHunter\Quarantine\Lumma_v4_Dropper.exe_20260915_160000.quarantined",
+                    FileSizeBytes = 184320,
+                    QuarantinedDate = DateTime.Now.AddHours(-2)
+                });
+                vm.QuarantinedItems.Add(new QuarantinedItem
+                {
+                    OriginalFileName = "Stealc_Staged_Payload.tmp",
+                    QuarantinedFileName = "Stealc_Staged_Payload.tmp_20260915_170000.quarantined",
+                    FullPath = @"C:\Users\User\AppData\Roaming\StealerHunter\Quarantine\Stealc_Staged_Payload.tmp_20260915_170000.quarantined",
+                    FileSizeBytes = 45056,
+                    QuarantinedDate = DateTime.Now.AddHours(-1)
+                });
+                vm.QuarantinedItems.Add(new QuarantinedItem
+                {
+                    OriginalFileName = "malicious_theme.theme",
+                    QuarantinedFileName = "malicious_theme.theme_20260915_173000.quarantined",
+                    FullPath = @"C:\Users\User\AppData\Roaming\StealerHunter\Quarantine\malicious_theme.theme_20260915_173000.quarantined",
+                    FileSizeBytes = 12288,
+                    QuarantinedDate = DateTime.Now.AddMinutes(-30)
+                });
+
+                string outDir = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\..\docs\screenshots"));
+                Directory.CreateDirectory(outDir);
+
+                window.Width = 1120;
+                window.Height = 750;
+                window.Show();
+
+                var tabs = new[]
+                {
+                    (Index: 0, FileName: "01_dashboard.png"),
+                    (Index: 1, FileName: "02_browser_shields.png"),
+                    (Index: 2, FileName: "03_quarantine_vault.png"),
+                    (Index: 3, FileName: "04_live_logs.png"),
+                    (Index: 4, FileName: "05_emergency_checklist.png"),
+                    (Index: 5, FileName: "06_settings.png")
+                };
+
+                foreach (var tab in tabs)
+                {
+                    vm.SelectedTabIndex = tab.Index;
+                    window.Measure(new System.Windows.Size(1120, 750));
+                    window.Arrange(new System.Windows.Rect(0, 0, 1120, 750));
+                    window.UpdateLayout();
+
+                    var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(1120, 750, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                    rtb.Render(window);
+
+                    var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                    encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+
+                    string destFile = Path.Combine(outDir, tab.FileName);
+                    using var fs = File.Create(destFile);
+                    encoder.Save(fs);
+                }
+
+                window.Close();
+            }
+            catch (Exception ex)
+            {
+                threadException = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        Assert.IsNull(threadException, $"Screenshot generation failed: {threadException}");
+    }
 }

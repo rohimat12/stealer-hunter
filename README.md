@@ -3,7 +3,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://microsoft.com)
 [![Framework](https://img.shields.io/badge/Framework-.NET%208%20WPF-purple.svg)](https://dotnet.microsoft.com/)
 [![Version](https://img.shields.io/badge/Version-v1.1.0-cyan.svg)](#)
-[![Tests](https://img.shields.io/badge/Tests-20%2F20%20Passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/Tests-24%2F24%20Passing-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Focus-Anti--Infostealer-red.svg)](#)
 [![Built With](https://img.shields.io/badge/Built%20With-AI%20Pair%20Programming-brightgreen.svg)](#)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#)
@@ -34,22 +34,28 @@ Pemantauan dan perlindungan integritas berkas kredensial (*Login Data, Cookies, 
   <img src="docs/screenshots/02_browser_shields.png" alt="Browser Shields" width="850">
 </p>
 
-### 3. 📜 Telemetri & Live Logs
+### 3. 📦 Quarantine Vault (Brankas Karantina)
+Daftar seluruh file malware, skrip dropper, dan arsip data curian yang telah diamankan ke ruang isolasi terenkripsi. Pengguna dapat merestore file jika diperlukan atau menghapusnya secara permanen dengan aman.
+<p align="center">
+  <img src="docs/screenshots/03_quarantine_vault.png" alt="Quarantine Vault" width="850">
+</p>
+
+### 4. 📜 Telemetri & Live Logs
 Log pemindaian real-time memantau status pemuatan database hash dan aktivitas latar belakang sistem.
 <p align="center">
-  <img src="docs/screenshots/03_live_logs.png" alt="Live Logs" width="850">
+  <img src="docs/screenshots/04_live_logs.png" alt="Live Logs" width="850">
 </p>
 
-### 4. 🚨 Emergency Security Checklist
+### 5. 🚨 Emergency Security Checklist
 Panduan tindakan darurat pasca-infeksi: pencabutan sesi web aktif (*Revoke Google/Microsoft sessions*), pergantian master email password, aktivasi 2FA, dan isolasi crypto wallet.
 <p align="center">
-  <img src="docs/screenshots/04_emergency_checklist.png" alt="Emergency Checklist" width="850">
+  <img src="docs/screenshots/05_emergency_checklist.png" alt="Emergency Checklist" width="850">
 </p>
 
-### 5. ⚙️ Settings & Auto-Start Configuration
-Pengaturan integrasi sistem Windows: pendaftaran autorun saat booting (dengan mode *silent*), minimize ke system tray pojok kanan bawah, dan watcher folder `%TEMP%`.
+### 6. ⚙️ Settings & Auto-Start Configuration
+Pengaturan integrasi sistem Windows: pendaftaran autorun saat booting via Windows Task Scheduler (dengan mode *silent*), proteksi latar belakang System Tray, dan watcher folder `%TEMP%`.
 <p align="center">
-  <img src="docs/screenshots/05_settings.png" alt="Settings &amp; Auto-Start" width="850">
+  <img src="docs/screenshots/06_settings.png" alt="Settings &amp; Auto-Start" width="850">
 </p>
 
 </details>
