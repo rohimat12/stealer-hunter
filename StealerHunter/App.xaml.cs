@@ -86,8 +86,6 @@ public partial class App : System.Windows.Application
         }
         catch { }
 
-        base.OnStartup(e);
-
         try
         {
             SetCurrentProcessExplicitAppUserModelID(AppId);
@@ -109,6 +107,18 @@ public partial class App : System.Windows.Application
         catch
         {
             // Non-critical if shortcut creation fails
+        }
+
+        // Initialize and conditionally display MainWindow
+        var mainWindow = new MainWindow();
+        MainWindow = mainWindow;
+
+        bool isSilent = e.Args.Any(a => a.Equals("--silent", StringComparison.OrdinalIgnoreCase) ||
+                                       a.Equals("--minimized", StringComparison.OrdinalIgnoreCase));
+
+        if (!isSilent)
+        {
+            mainWindow.Show();
         }
     }
 

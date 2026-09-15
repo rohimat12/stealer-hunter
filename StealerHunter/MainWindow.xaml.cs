@@ -50,10 +50,7 @@ public partial class MainWindow : Window
             if (args.Any(a => a.Equals("--silent", StringComparison.OrdinalIgnoreCase) ||
                               a.Equals("--minimized", StringComparison.OrdinalIgnoreCase)))
             {
-                // Start hidden in system tray
-                WindowState = WindowState.Minimized;
                 ShowInTaskbar = false;
-                Hide();
                 _trayService.ShowNotification(
                     "StealerHunter Active",
                     "Running in background. Your browser credentials are protected.",

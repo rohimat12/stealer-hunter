@@ -16,15 +16,17 @@ public class AutoStartupService
         try
         {
             // 1. Check Windows Task Scheduler
-            var psi = new ProcessStartInfo
+            var psi = new ProcessStartInfo("schtasks.exe")
             {
-                FileName = "schtasks.exe",
-                Arguments = $"/Query /TN \"{TaskName}\"",
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
+            psi.ArgumentList.Add("/Query");
+            psi.ArgumentList.Add("/TN");
+            psi.ArgumentList.Add(TaskName);
+
             using var proc = Process.Start(psi);
             proc?.WaitForExit(2000);
             if (proc != null && proc.ExitCode == 0)
@@ -32,9 +34,18 @@ public class AutoStartupService
                 return true;
             }
 
-            // 2. Check Registry Run key
-            using var key = Registry.CurrentUser.OpenSubKey(RunRegistryKey, false);
-            return key?.GetValue(AppName) != null;
+            // 2. Check Registry Run keys (HKCU & HKLM)
+            using (var hkcuKey = Registry.CurrentUser.OpenSubKey(RunRegistryKey, false))
+            {
+                if (hkcuKey?.GetValue(AppName) != null) return true;
+            }
+
+            using (var hklmKey = Registry.LocalMachine.OpenSubKey(RunRegistryKey, false))
+            {
+                if (hklmKey?.GetValue(AppName) != null) return true;
+            }
+
+            return false;
         }
         catch
         {
@@ -57,13 +68,24 @@ public class AutoStartupService
                 // 1. Create elevated Task Scheduler entry (Bypasses UAC block on logon)
                 try
                 {
-                    var psi = new ProcessStartInfo
+                    var psi = new ProcessStartInfo("schtasks.exe")
                     {
-                        FileName = "schtasks.exe",
-                        Arguments = $"/Create /TN \"{TaskName}\" /TR \"\\\"{exePath}\\\" --silent\" /SC ONLOGON /RL HIGHEST /F",
                         CreateNoWindow = true,
-                        UseShellExecute = false
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
                     };
+                    psi.ArgumentList.Add("/Create");
+                    psi.ArgumentList.Add("/TN");
+                    psi.ArgumentList.Add(TaskName);
+                    psi.ArgumentList.Add("/TR");
+                    psi.ArgumentList.Add($"\"{exePath}\" --silent");
+                    psi.ArgumentList.Add("/SC");
+                    psi.ArgumentList.Add("ONLOGON");
+                    psi.ArgumentList.Add("/RL");
+                    psi.ArgumentList.Add("HIGHEST");
+                    psi.ArgumentList.Add("/F");
+
                     using var proc = Process.Start(psi);
                     if (proc != null) proc.WaitForExit(3000);
                 }
@@ -82,24 +104,37 @@ public class AutoStartupService
                 // Remove from Task Scheduler
                 try
                 {
-                    var psi = new ProcessStartInfo
+                    var psi = new ProcessStartInfo("schtasks.exe")
                     {
-                        FileName = "schtasks.exe",
-                        Arguments = $"/Delete /TN \"{TaskName}\" /F",
                         CreateNoWindow = true,
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true
                     };
+                    psi.ArgumentList.Add("/Delete");
+                    psi.ArgumentList.Add("/TN");
+                    psi.ArgumentList.Add(TaskName);
+                    psi.ArgumentList.Add("/F");
+
                     using var proc = Process.Start(psi);
                     proc?.WaitForExit(3000);
                 }
                 catch { }
 
-                // Remove from Registry
+                // Remove from Registry (HKCU & HKLM)
                 try
                 {
                     using var key = Registry.CurrentUser.OpenSubKey(RunRegistryKey, true);
+                    if (key?.GetValue(AppName) != null)
+                    {
+                        key.DeleteValue(AppName, false);
+                    }
+                }
+                catch { }
+
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(RunRegistryKey, true);
                     if (key?.GetValue(AppName) != null)
                     {
                         key.DeleteValue(AppName, false);

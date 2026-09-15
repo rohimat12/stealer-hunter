@@ -59,6 +59,9 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDi
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{app}\{#MyAppExeName}"" --silent"; Flags: uninsdeletevalue; Tasks: startupicon
 
 [Run]
+; 1. Register elevated Task Scheduler startup task (bypasses Windows UAC logon block for admin apps)
+Filename: "{sys}\schtasks.exe"; Parameters: "/Create /TN ""{#MyAppName}"" /TR """"{app}\{#MyAppExeName}"" --silent"" /SC ONLOGON /RL HIGHEST /F"; Flags: runhidden; Tasks: startupicon
+; 2. Launch program after setup
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent runascurrentuser
 
 [UninstallRun]
