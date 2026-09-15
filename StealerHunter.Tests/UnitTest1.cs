@@ -144,6 +144,77 @@ public class SecurityServicesTests
     }
 
     [TestMethod]
+    public void TestThreatsListRenderingAndDataTemplateNoCrash()
+    {
+        Exception? threadException = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (System.Windows.Application.Current == null)
+                {
+                    _ = new System.Windows.Application();
+                }
+
+                var window = new MainWindow();
+                var vm = (StealerHunter.ViewModels.MainViewModel)window.DataContext;
+
+                // 1. Add active unresolved threat (renders Danger button)
+                vm.DetectedThreats.Add(new StealerHunter.Models.ThreatItem
+                {
+                    Name = "RedLine Stealer Dropper",
+                    Description = "Active infostealer payload in Temp directory",
+                    FilePath = @"C:\Users\test\AppData\Local\Temp\malware.exe",
+                    Category = StealerHunter.Models.ThreatCategory.SuspiciousProcess,
+                    Severity = StealerHunter.Models.ThreatSeverity.High,
+                    IsResolved = false
+                });
+
+                // 2. Add resolved threat with restore capability (renders BtnOutline Restore button)
+                vm.DetectedThreats.Add(new StealerHunter.Models.ThreatItem
+                {
+                    Name = "ICSYS Persistence Hook",
+                    Description = "Registry startup autorun dropper",
+                    FilePath = @"C:\Users\test\AppData\Roaming\dropper.exe",
+                    QuarantineBackupPath = @"C:\Users\test\AppData\Roaming\StealerHunter\Quarantine\backup.quarantined",
+                    Category = StealerHunter.Models.ThreatCategory.PersistenceAutorun,
+                    Severity = StealerHunter.Models.ThreatSeverity.Critical,
+                    IsResolved = true
+                });
+
+                // 3. Add quarantine vault item
+                vm.QuarantinedItems.Add(new StealerHunter.Models.QuarantinedItem
+                {
+                    FullPath = @"C:\Users\test\AppData\Roaming\StealerHunter\Quarantine\20260915_sample.exe.quarantined",
+                    QuarantinedFileName = "20260915_sample.exe.quarantined",
+                    OriginalFileName = "sample.exe",
+                    FileSizeBytes = 102400,
+                    QuarantinedDate = DateTime.Now
+                });
+
+                // Cycle through all tabs to force DataTemplate instantiation and measurement
+                for (int i = 0; i < 6; i++)
+                {
+                    vm.SelectedTabIndex = i;
+                    window.Show();
+                    window.UpdateLayout();
+                }
+
+                window.Close();
+            }
+            catch (Exception ex)
+            {
+                threadException = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        Assert.IsNull(threadException, $"Rendering Threats List DataTemplate failed with exception: {threadException}");
+    }
+
+    [TestMethod]
     public void TestQuarantineServiceSafeIsolationAndRestore()
     {
         var quarantineService = new QuarantineService();
