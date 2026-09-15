@@ -474,4 +474,45 @@ public class SecurityServicesTests
             }
         }
     }
+
+    [TestMethod]
+    public void TestForceDeleteFileStripsProtectedAttributes()
+    {
+        var tempFolder = Path.Combine(Path.GetTempPath(), "SH_DeleteTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempFolder);
+
+        try
+        {
+            var protectedFile = Path.Combine(tempFolder, "malware_protected.exe.quarantined");
+            File.WriteAllText(protectedFile, "SAMPLE MALWARE CONTENT");
+
+            // Simulate malware setting ReadOnly, Hidden, and System attributes (attrib +r +h +s)
+            File.SetAttributes(protectedFile, FileAttributes.ReadOnly | FileAttributes.Hidden | FileAttributes.System);
+
+            // Standard File.Delete would throw UnauthorizedAccessException
+            bool regularDeleteThrew = false;
+            try
+            {
+                File.Delete(protectedFile);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                regularDeleteThrew = true;
+            }
+            Assert.IsTrue(regularDeleteThrew, "Standard File.Delete must fail on ReadOnly files with Access Denied");
+            Assert.IsTrue(File.Exists(protectedFile), "File should still exist after failed delete");
+
+            // ForceDeleteFile must succeed by normalizing attributes first
+            bool success = QuarantineService.ForceDeleteFile(protectedFile);
+            Assert.IsTrue(success, "ForceDeleteFile must succeed on ReadOnly/Hidden/System files");
+            Assert.IsFalse(File.Exists(protectedFile), "File must be deleted completely from disk");
+        }
+        finally
+        {
+            if (Directory.Exists(tempFolder))
+            {
+                try { Directory.Delete(tempFolder, true); } catch { }
+            }
+        }
+    }
 }

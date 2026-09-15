@@ -35,6 +35,13 @@ public class QuarantineService
             try
             {
                 var fi = new FileInfo(file);
+                // Ensure attributes are stripped of ReadOnly/Hidden/System so user operations won't fail
+                if (fi.IsReadOnly || (fi.Attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0)
+                {
+                    try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
+                    fi.Refresh();
+                }
+
                 var qName = fi.Name;
                 var origName = ExtractOriginalFileName(qName);
                 list.Add(new QuarantinedItem
@@ -49,6 +56,30 @@ public class QuarantineService
             catch { }
         }
         return list.OrderByDescending(x => x.QuarantinedDate).ToList();
+    }
+
+    public static bool ForceDeleteFile(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return true;
+
+        try
+        {
+            // Malware files frequently set ReadOnly, Hidden, and System attributes (attrib +r +h +s)
+            // to block deletion. Reset to Normal before deleting.
+            File.SetAttributes(filePath, FileAttributes.Normal);
+            File.Delete(filePath);
+            return true;
+        }
+        catch
+        {
+            try
+            {
+                // Fallback for locked files: schedule post-reboot kernel deletion
+                MoveFileEx(filePath, null, MOVEFILE_DELAY_UNTIL_REBOOT);
+            }
+            catch { }
+            return false;
+        }
     }
 
     public static string ExtractOriginalFileName(string fileName)
@@ -370,16 +401,16 @@ public class QuarantineService
 
             // 3. Atomic commit: move .tmp to final .quarantined vault
             File.Move(tempDestPath, destPath, overwrite: true);
+            try { File.SetAttributes(destPath, FileAttributes.Normal); } catch { }
             destinationPath = destPath;
 
-            // 4. Attempt to delete original file
-            try
+            // 4. Attempt to delete original file (stripping ReadOnly/Hidden/System attributes first)
+            if (ForceDeleteFile(filePath))
             {
-                File.Delete(filePath);
                 message = $"File neutralized (XOR-streamed) and isolated to quarantine: {destFileName}";
                 return true;
             }
-            catch
+            else
             {
                 // Fallback if file is locked: Schedule Windows kernel to delete file on next reboot
                 bool scheduled = MoveFileEx(filePath, null, MOVEFILE_DELAY_UNTIL_REBOOT);

@@ -753,7 +753,7 @@ public class MainViewModel : INotifyPropertyChanged
                         {
                             if (QuarantineService.IsPathInsideQuarantineDirectory(fullPath) && File.Exists(fullPath))
                             {
-                                File.Delete(fullPath);
+                                QuarantineService.ForceDeleteFile(fullPath);
                             }
                         }
                         catch { }
@@ -795,15 +795,24 @@ public class MainViewModel : INotifyPropertyChanged
 
             try
             {
+                bool deleted = false;
                 await Task.Run(() =>
                 {
                     if (QuarantineService.IsPathInsideQuarantineDirectory(fullPath) && File.Exists(fullPath))
                     {
-                        File.Delete(fullPath);
+                        deleted = QuarantineService.ForceDeleteFile(fullPath);
                     }
                 });
 
-                AddLog("WARN", $"[VAULT DELETED] Permanently removed: {origName}");
+                if (deleted)
+                {
+                    AddLog("WARN", $"[VAULT DELETED] Permanently removed: {origName}");
+                }
+                else
+                {
+                    AddLog("DANGER", $"[VAULT DELETE FAILED] Could not permanently remove: {origName}");
+                    System.Windows.MessageBox.Show($"Failed to delete file '{origName}'. The file might be in use or locked.", "Delete Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                }
                 RefreshQuarantinedItems();
             }
             catch (Exception ex)
@@ -837,8 +846,10 @@ public class MainViewModel : INotifyPropertyChanged
                     {
                         if (QuarantineService.IsPathInsideQuarantineDirectory(item.FullPath) && File.Exists(item.FullPath))
                         {
-                            File.Delete(item.FullPath);
-                            count++;
+                            if (QuarantineService.ForceDeleteFile(item.FullPath))
+                            {
+                                count++;
+                            }
                         }
                     }
                     catch { }
