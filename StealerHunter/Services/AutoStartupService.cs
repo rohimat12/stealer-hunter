@@ -200,7 +200,7 @@ public class AutoStartupService
         }
     }
 
-    private static void CleanupLegacyRegistryKeys()
+    public static void CleanupLegacyRegistryKeys()
     {
         try
         {

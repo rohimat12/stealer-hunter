@@ -75,6 +75,10 @@ public class MainViewModel : INotifyPropertyChanged
             {
                 AutoStartupService.SetAutoStart(true);
             }
+            else
+            {
+                AutoStartupService.CleanupLegacyRegistryKeys();
+            }
             _runOnStartup = AutoStartupService.IsAutoStartEnabled();
             _realtimeProtectionEnabled = _settings.RealtimeProtectionEnabled;
             _startMinimizedToTray = _settings.StartMinimizedToTray;

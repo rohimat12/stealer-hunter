@@ -54,6 +54,11 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingD
 ; Desktop shortcut
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\Assets\app.ico"; Tasks: desktopicon; AppUserModelID: "{#AppUserModelId}"
 
+[Registry]
+; Clean up any legacy registry Run entries (prevent dead entries in Task Manager)
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "{#MyAppName}"; Flags: deletevalue uninsdeletevalue
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "{#MyAppName}"; Flags: deletevalue uninsdeletevalue
+
 [Run]
 ; 1. Register elevated Task Scheduler startup task (bypasses Windows UAC logon block for admin apps)
 Filename: "{sys}\schtasks.exe"; Parameters: "/Create /TN ""{#MyAppName}"" /TR """"'""{app}\{#MyAppExeName}""' --silent"" /SC ONLOGON /RL HIGHEST /F"; Flags: runhidden; Tasks: startupicon

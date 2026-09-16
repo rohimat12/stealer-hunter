@@ -5,7 +5,7 @@ namespace StealerHunter.Models;
 
 public class AppSettings
 {
-    public bool RunOnStartup { get; set; } = false;
+    public bool RunOnStartup { get; set; } = true;
     public bool StartMinimizedToTray { get; set; } = true;
     public bool RealtimeProtectionEnabled { get; set; } = true;
     public bool SoundAlertOnThreat { get; set; } = true;
