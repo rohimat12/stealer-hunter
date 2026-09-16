@@ -15,7 +15,7 @@ public class AutoStartupService
     {
         try
         {
-            // 1. Check Windows Task Scheduler (The only reliable mechanism for elevated apps)
+            // 1. Check Windows Task Scheduler
             var psi = new ProcessStartInfo("schtasks.exe")
             {
                 CreateNoWindow = true,
@@ -29,7 +29,11 @@ public class AutoStartupService
 
             using var proc = Process.Start(psi);
             proc?.WaitForExit(2000);
-            return proc != null && proc.ExitCode == 0;
+            if (proc != null && proc.ExitCode == 0) return true;
+
+            // 2. Fallback check HKCU Run key
+            using var hkcuKey = Registry.CurrentUser.OpenSubKey(RunRegistryKey, false);
+            return hkcuKey?.GetValue(AppName) != null;
         }
         catch
         {
@@ -47,8 +51,8 @@ public class AutoStartupService
                 exePath = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
             }
 
-            // Always clean up legacy/dead registry Run keys (Windows blocks elevated apps in Run keys on boot)
-            CleanupLegacyRegistryKeys();
+            // Always clean up legacy direct-exe registry Run keys (Windows blocks elevated exes directly in Run keys)
+            CleanupLegacyDirectExeKeys();
 
             if (enable && !string.IsNullOrEmpty(exePath))
             {
@@ -83,10 +87,23 @@ public class AutoStartupService
                     }
                     catch { }
                 }
+
+                // 2. Register in HKCU Run to trigger the task and display StealerHunter in Task Manager "Startup apps" tab
+                try
+                {
+                    using var hkcuKey = Registry.CurrentUser.OpenSubKey(RunRegistryKey, true);
+                    if (hkcuKey != null)
+                    {
+                        var schtasksExe = Path.Combine(Environment.SystemDirectory, "schtasks.exe");
+                        if (!File.Exists(schtasksExe)) schtasksExe = "schtasks.exe";
+                        hkcuKey.SetValue(AppName, $"\"{schtasksExe}\" /run /tn \"{TaskName}\"", RegistryValueKind.String);
+                    }
+                }
+                catch { }
             }
             else
             {
-                // Remove from Task Scheduler
+                // 1. Remove from Task Scheduler
                 try
                 {
                     var psi = new ProcessStartInfo("schtasks.exe")
@@ -105,6 +122,9 @@ public class AutoStartupService
                     proc?.WaitForExit(3000);
                 }
                 catch { }
+
+                // 2. Remove from Registry Run
+                CleanupAllRegistryKeys();
             }
         }
         catch
@@ -200,7 +220,33 @@ public class AutoStartupService
         }
     }
 
-    public static void CleanupLegacyRegistryKeys()
+    public static void CleanupLegacyDirectExeKeys()
+    {
+        try
+        {
+            // Remove from HKLM if present (HKLM requires admin and Windows blocks direct elevated exes anyway)
+            using var hklmKey = Registry.LocalMachine.OpenSubKey(RunRegistryKey, true);
+            if (hklmKey?.GetValue(AppName) != null)
+            {
+                hklmKey.DeleteValue(AppName, false);
+            }
+        }
+        catch { }
+
+        try
+        {
+            // Clean up HKCU only if it still points directly to .exe (instead of schtasks)
+            using var hkcuKey = Registry.CurrentUser.OpenSubKey(RunRegistryKey, true);
+            var val = hkcuKey?.GetValue(AppName)?.ToString();
+            if (!string.IsNullOrEmpty(val) && !val.Contains("schtasks", StringComparison.OrdinalIgnoreCase))
+            {
+                hkcuKey?.DeleteValue(AppName, false);
+            }
+        }
+        catch { }
+    }
+
+    public static void CleanupAllRegistryKeys()
     {
         try
         {
@@ -222,4 +268,6 @@ public class AutoStartupService
         }
         catch { }
     }
+
+    public static void CleanupLegacyRegistryKeys() => CleanupAllRegistryKeys();
 }

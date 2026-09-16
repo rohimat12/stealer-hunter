@@ -55,9 +55,10 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingD
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\Assets\app.ico"; Tasks: desktopicon; AppUserModelID: "{#AppUserModelId}"
 
 [Registry]
-; Clean up any legacy registry Run entries (prevent dead entries in Task Manager)
+; Clean up any legacy direct-exe HKLM registry Run entry
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "{#MyAppName}"; Flags: deletevalue uninsdeletevalue
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "{#MyAppName}"; Flags: deletevalue uninsdeletevalue
+; Register HKCU Run entry to trigger Task Scheduler (enables visible listing in Windows Task Manager Startup Apps)
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{sys}\schtasks.exe"" /run /tn ""{#MyAppName}"""; Flags: uninsdeletevalue; Tasks: startupicon
 
 [Run]
 ; 1. Register elevated Task Scheduler startup task (bypasses Windows UAC logon block for admin apps)
