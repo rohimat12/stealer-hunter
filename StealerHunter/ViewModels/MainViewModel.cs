@@ -71,6 +71,10 @@ public class MainViewModel : INotifyPropertyChanged
         {
             RefreshQuarantinedItems();
 
+            if (_settings.RunOnStartup)
+            {
+                AutoStartupService.SetAutoStart(true);
+            }
             _runOnStartup = AutoStartupService.IsAutoStartEnabled();
             _realtimeProtectionEnabled = _settings.RealtimeProtectionEnabled;
             _startMinimizedToTray = _settings.StartMinimizedToTray;

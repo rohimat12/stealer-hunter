@@ -54,13 +54,9 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingD
 ; Desktop shortcut
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\Assets\app.ico"; Tasks: desktopicon; AppUserModelID: "{#AppUserModelId}"
 
-[Registry]
-; Auto-start on boot minimized to tray
-Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{app}\{#MyAppExeName}"" --silent"; Flags: uninsdeletevalue; Tasks: startupicon
-
 [Run]
 ; 1. Register elevated Task Scheduler startup task (bypasses Windows UAC logon block for admin apps)
-Filename: "{sys}\schtasks.exe"; Parameters: "/Create /TN ""{#MyAppName}"" /TR """"{app}\{#MyAppExeName}"" --silent"" /SC ONLOGON /RL HIGHEST /F"; Flags: runhidden; Tasks: startupicon
+Filename: "{sys}\schtasks.exe"; Parameters: "/Create /TN ""{#MyAppName}"" /TR """"'""{app}\{#MyAppExeName}""' --silent"" /SC ONLOGON /RL HIGHEST /F"; Flags: runhidden; Tasks: startupicon
 ; 2. Launch program after setup
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent runascurrentuser
 

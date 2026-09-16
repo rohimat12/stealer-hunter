@@ -15,7 +15,7 @@ public class AutoStartupService
     {
         try
         {
-            // 1. Check Windows Task Scheduler
+            // 1. Check Windows Task Scheduler (The only reliable mechanism for elevated apps)
             var psi = new ProcessStartInfo("schtasks.exe")
             {
                 CreateNoWindow = true,
@@ -29,23 +29,7 @@ public class AutoStartupService
 
             using var proc = Process.Start(psi);
             proc?.WaitForExit(2000);
-            if (proc != null && proc.ExitCode == 0)
-            {
-                return true;
-            }
-
-            // 2. Check Registry Run keys (HKCU & HKLM)
-            using (var hkcuKey = Registry.CurrentUser.OpenSubKey(RunRegistryKey, false))
-            {
-                if (hkcuKey?.GetValue(AppName) != null) return true;
-            }
-
-            using (var hklmKey = Registry.LocalMachine.OpenSubKey(RunRegistryKey, false))
-            {
-                if (hklmKey?.GetValue(AppName) != null) return true;
-            }
-
-            return false;
+            return proc != null && proc.ExitCode == 0;
         }
         catch
         {
@@ -63,41 +47,42 @@ public class AutoStartupService
                 exePath = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
             }
 
+            // Always clean up legacy/dead registry Run keys (Windows blocks elevated apps in Run keys on boot)
+            CleanupLegacyRegistryKeys();
+
             if (enable && !string.IsNullOrEmpty(exePath))
             {
-                // 1. Create elevated Task Scheduler entry (Bypasses UAC block on logon)
-                try
+                // 1. Create elevated Task Scheduler entry via XML (100% robust against spaces and arguments)
+                bool created = CreateTaskSchedulerEntry(exePath);
+
+                // Fallback attempt via command-line arguments if XML method didn't succeed
+                if (!created)
                 {
-                    var psi = new ProcessStartInfo("schtasks.exe")
+                    try
                     {
-                        CreateNoWindow = true,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    };
-                    psi.ArgumentList.Add("/Create");
-                    psi.ArgumentList.Add("/TN");
-                    psi.ArgumentList.Add(TaskName);
-                    psi.ArgumentList.Add("/TR");
-                    psi.ArgumentList.Add($"\"{exePath}\" --silent");
-                    psi.ArgumentList.Add("/SC");
-                    psi.ArgumentList.Add("ONLOGON");
-                    psi.ArgumentList.Add("/RL");
-                    psi.ArgumentList.Add("HIGHEST");
-                    psi.ArgumentList.Add("/F");
+                        var psi = new ProcessStartInfo("schtasks.exe")
+                        {
+                            CreateNoWindow = true,
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true
+                        };
+                        psi.ArgumentList.Add("/Create");
+                        psi.ArgumentList.Add("/TN");
+                        psi.ArgumentList.Add(TaskName);
+                        psi.ArgumentList.Add("/TR");
+                        psi.ArgumentList.Add($"\"'{exePath}' --silent\"");
+                        psi.ArgumentList.Add("/SC");
+                        psi.ArgumentList.Add("ONLOGON");
+                        psi.ArgumentList.Add("/RL");
+                        psi.ArgumentList.Add("HIGHEST");
+                        psi.ArgumentList.Add("/F");
 
-                    using var proc = Process.Start(psi);
-                    if (proc != null) proc.WaitForExit(3000);
+                        using var proc = Process.Start(psi);
+                        if (proc != null) proc.WaitForExit(3000);
+                    }
+                    catch { }
                 }
-                catch { }
-
-                // 2. Fallback / supplementary Registry Run key
-                try
-                {
-                    using var key = Registry.CurrentUser.OpenSubKey(RunRegistryKey, true);
-                    key?.SetValue(AppName, $"\"{exePath}\" --silent");
-                }
-                catch { }
             }
             else
             {
@@ -120,27 +105,6 @@ public class AutoStartupService
                     proc?.WaitForExit(3000);
                 }
                 catch { }
-
-                // Remove from Registry (HKCU & HKLM)
-                try
-                {
-                    using var key = Registry.CurrentUser.OpenSubKey(RunRegistryKey, true);
-                    if (key?.GetValue(AppName) != null)
-                    {
-                        key.DeleteValue(AppName, false);
-                    }
-                }
-                catch { }
-
-                try
-                {
-                    using var key = Registry.LocalMachine.OpenSubKey(RunRegistryKey, true);
-                    if (key?.GetValue(AppName) != null)
-                    {
-                        key.DeleteValue(AppName, false);
-                    }
-                }
-                catch { }
             }
         }
         catch
@@ -151,5 +115,111 @@ public class AutoStartupService
         // Final verification: ensure actual ground truth matches requested state
         bool isCurrentlyEnabled = IsAutoStartEnabled();
         return enable ? isCurrentlyEnabled : !isCurrentlyEnabled;
+    }
+
+    private static bool CreateTaskSchedulerEntry(string exePath)
+    {
+        string tempXmlPath = Path.Combine(Path.GetTempPath(), $"StealerHunter_Task_{Guid.NewGuid():N}.xml");
+        try
+        {
+            string xmlContent = $@"<?xml version=""1.0"" encoding=""UTF-16""?>
+<Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
+  <RegistrationInfo>
+    <Description>StealerHunter Anti-Infostealer Resident Background Guardian</Description>
+    <Author>StealerHunter</Author>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id=""Author"">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>true</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context=""Author"">
+    <Exec>
+      <Command>{exePath}</Command>
+      <Arguments>--silent</Arguments>
+    </Exec>
+  </Actions>
+</Task>";
+
+            File.WriteAllText(tempXmlPath, xmlContent, System.Text.Encoding.Unicode);
+
+            var psi = new ProcessStartInfo("schtasks.exe")
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            psi.ArgumentList.Add("/Create");
+            psi.ArgumentList.Add("/TN");
+            psi.ArgumentList.Add(TaskName);
+            psi.ArgumentList.Add("/XML");
+            psi.ArgumentList.Add(tempXmlPath);
+            psi.ArgumentList.Add("/F");
+
+            using var proc = Process.Start(psi);
+            proc?.WaitForExit(3000);
+            return proc != null && proc.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempXmlPath)) File.Delete(tempXmlPath);
+            }
+            catch { }
+        }
+    }
+
+    private static void CleanupLegacyRegistryKeys()
+    {
+        try
+        {
+            using var hkcuKey = Registry.CurrentUser.OpenSubKey(RunRegistryKey, true);
+            if (hkcuKey?.GetValue(AppName) != null)
+            {
+                hkcuKey.DeleteValue(AppName, false);
+            }
+        }
+        catch { }
+
+        try
+        {
+            using var hklmKey = Registry.LocalMachine.OpenSubKey(RunRegistryKey, true);
+            if (hklmKey?.GetValue(AppName) != null)
+            {
+                hklmKey.DeleteValue(AppName, false);
+            }
+        }
+        catch { }
     }
 }
