@@ -15,9 +15,11 @@ Format mengikuti standar [Keep a Changelog](https://keepachangelog.com/en/1.0.0/
 - **🛡️ Single-Instance Process Guardian:**
   - Mekanisme `Mutex` lintas-proses untuk mencegah proses aplikasi berjalan ganda.
   - Sinyal antar-proses berbasis `EventWaitHandle` yang otomatis memunculkan dan memfokuskan jendela utama saat aplikasi dibuka kembali.
-- **⚙️ Elevated Windows Task Scheduler Auto-Start:**
-  - Pendaftaran autorun otomatis berbasis Task Scheduler (`schtasks.exe /SC ONLOGON /RL HIGHEST`) untuk mengatasi pembatasan UAC Windows saat komputer menyala.
-  - Mode background `--silent` / `--minimized` yang langsung aktif di System Tray saat booting.
+- **⚙️ Hybrid Windows Task Scheduler & Registry Autorun:**
+  - Pendaftaran autorun ganda berbasis Task Scheduler (`schtasks.exe /SC ONLOGON /RL HIGHEST`) dan Registry `HKCU\...\Run` trigger.
+  - Memungkinkan aplikasi berjalan otomatis dengan hak Administrator penuh tanpa terhambat blokir UAC Windows saat booting, sekaligus tetap tampil di tab *Startup apps* Windows Task Manager.
+  - Penambahan argumen CLI *headless* `--register-startup` dan `--unregister-startup` untuk integrasi otomatis saat instalasi.
+  - Mode background `--silent` / `--minimized` yang langsung aktif di System Tray saat login.
 - **🔍 Deep NTFS MFT & USN Change Journal Hunter:**
   - Pemindaian struktur tingkat rendah NTFS untuk mendeteksi jejak dropper atau infostealer yang berusaha melakukan *self-deletion* atau bersembunyi di partisi sekunder.
 - **🗜️ Archive Deep Inspector (.zip, .rar, .7z):**
