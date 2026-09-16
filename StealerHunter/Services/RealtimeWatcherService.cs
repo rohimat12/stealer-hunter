@@ -95,8 +95,16 @@ public class RealtimeWatcherService : IDisposable
             var name = rawName?.ToLowerInvariant() ?? string.Empty;
             if (string.IsNullOrEmpty(name)) return;
 
-            // Skip PyInstaller / Python runtime temporary extractions (e.g. _MEIxxxxx\base_library.zip)
-            if (name.Contains("_mei") || name.Contains("base_library.zip"))
+            // Skip legitimate build tools, package managers, and runtime temporary extractions
+            if (name.Contains("_mei") ||
+                name.Contains("base_library.zip") ||
+                name.StartsWith("npm-", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("pip-", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("yarn-", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("is-", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("nuget") ||
+                name.Contains("gradle") ||
+                name.Contains("flutter_tools"))
             {
                 return;
             }

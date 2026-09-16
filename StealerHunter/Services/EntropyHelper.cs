@@ -182,7 +182,22 @@ public static class EntropyHelper
             }
 
             var fi = new FileInfo(filePath);
-            if (fi.Length < 512) return false;
+            // Credential dumps are strictly within 512 bytes to 6 MB.
+            // Exclude large build streams, installer packages, video/audio temp caches.
+            if (fi.Length < 512 || fi.Length > 6 * 1024 * 1024) return false;
+
+            var fn = Path.GetFileName(filePath).ToLowerInvariant();
+            // Whitelist known installer / build / package manager streaming temp patterns
+            if (System.Text.RegularExpressions.Regex.IsMatch(fn, @"^[0-9a-f]{8}-[0-9]+-[0-9]+\.tmp$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+                fn.StartsWith("is-", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("npm-", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("pip-", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("yarn-", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("tmp.", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("~", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
 
             // Read header bytes first
             byte[] header = new byte[32];
