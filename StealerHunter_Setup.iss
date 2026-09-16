@@ -61,15 +61,16 @@ Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: 
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{sys}\schtasks.exe"" /run /tn ""{#MyAppName}"""; Flags: uninsdeletevalue; Tasks: startupicon
 
 [Run]
-; 1. Register elevated Task Scheduler startup task (bypasses Windows UAC logon block for admin apps)
-Filename: "{sys}\schtasks.exe"; Parameters: "/Create /TN ""{#MyAppName}"" /TR """"'""{app}\{#MyAppExeName}""' --silent"" /SC ONLOGON /RL HIGHEST /F"; Flags: runhidden; Tasks: startupicon
+; 1. Execute elevated startup registration via StealerHunter.exe internal XML engine
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-startup"; Flags: runhidden; Tasks: startupicon
 ; 2. Launch program after setup
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent runascurrentuser
 
 [UninstallRun]
 ; Gracefully terminate running StealerHunter before uninstallation
 Filename: "taskkill.exe"; Parameters: "/F /IM {#MyAppExeName}"; Flags: runhidden; RunOnceId: "StopStealerHunter"
-; Remove startup Task Scheduler entry if created
+; Unregister startup Task Scheduler and Registry keys
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--unregister-startup"; Flags: runhidden; RunOnceId: "UnregisterStartupTask"
 Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""{#MyAppName}"" /F"; Flags: runhidden; RunOnceId: "RemoveStealerHunterTask"
 
 [UninstallDelete]

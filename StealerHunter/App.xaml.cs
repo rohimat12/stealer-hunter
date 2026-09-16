@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
+using StealerHunter.Models;
 using StealerHunter.Services;
 
 namespace StealerHunter;
@@ -25,6 +26,35 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // 0. Handle headless helper arguments for installer and background tasks
+        if (e.Args.Any(a => a.Equals("--register-startup", StringComparison.OrdinalIgnoreCase)))
+        {
+            AutoStartupService.SetAutoStart(true);
+            try
+            {
+                var settings = AppSettings.Load();
+                settings.RunOnStartup = true;
+                settings.Save();
+            }
+            catch { }
+            Shutdown(0);
+            return;
+        }
+
+        if (e.Args.Any(a => a.Equals("--unregister-startup", StringComparison.OrdinalIgnoreCase)))
+        {
+            AutoStartupService.SetAutoStart(false);
+            try
+            {
+                var settings = AppSettings.Load();
+                settings.RunOnStartup = false;
+                settings.Save();
+            }
+            catch { }
+            Shutdown(0);
+            return;
+        }
+
         // 1. Enforce Single-Instance Application (Per-User Session)
         bool isFirstInstance;
         try

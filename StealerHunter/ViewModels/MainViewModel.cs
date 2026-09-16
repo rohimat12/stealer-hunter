@@ -71,15 +71,18 @@ public class MainViewModel : INotifyPropertyChanged
         {
             RefreshQuarantinedItems();
 
-            if (_settings.RunOnStartup)
+            bool isSystemStartupActive = AutoStartupService.IsAutoStartEnabled();
+            if (_settings.RunOnStartup || isSystemStartupActive)
             {
                 AutoStartupService.SetAutoStart(true);
+                _settings.RunOnStartup = true;
+                _settings.Save();
             }
             else
             {
-                AutoStartupService.CleanupLegacyRegistryKeys();
+                AutoStartupService.CleanupLegacyDirectExeKeys();
             }
-            _runOnStartup = AutoStartupService.IsAutoStartEnabled();
+            _runOnStartup = _settings.RunOnStartup;
             _realtimeProtectionEnabled = _settings.RealtimeProtectionEnabled;
             _startMinimizedToTray = _settings.StartMinimizedToTray;
             _soundAlertOnThreat = _settings.SoundAlertOnThreat;
