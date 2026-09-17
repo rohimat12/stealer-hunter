@@ -11,6 +11,10 @@
 
 **StealerHunter** adalah perangkat lunak pertahanan siber desktop (*Defensive Anti-Malware Suite*) berbasis **C# (.NET 8 WPF)** yang dirancang khusus untuk memburu, menghentikan, dan membersihkan malware pencuri kata sandi (**Infostealer**) seperti **Lumma Stealer, RedLine, Stealc, Vidar, dan Raccoon**, serta mengamankan basis data kredensial dan *session cookies* peramban (browser).
 
+> [!IMPORTANT]
+> **Defensive Security & Clarification Notice**:  
+> **StealerHunter** is a **100% defensive, open-source endpoint protection tool**. It is **NOT** a malware, nor is it affiliated in any way with the *"Hunter Stealer"* malware family. Its sole purpose is to hunt down, neutralize, and clean computers from infostealer infections.
+
 <p align="center">
   <img src="docs/screenshots/01_dashboard.png" alt="StealerHunter Scanner &amp; Dashboard" width="900">
 </p>
