@@ -3,12 +3,13 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://microsoft.com)
 [![Framework](https://img.shields.io/badge/Framework-.NET%208%20WPF-purple.svg)](https://dotnet.microsoft.com/)
 [![Version](https://img.shields.io/badge/Version-v1.1.0-cyan.svg)](#)
-[![Tests](https://img.shields.io/badge/Tests-24%2F24%20Passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/Tests-25%2F25%20Passing-brightgreen.svg)](#)
+[![Type](https://img.shields.io/badge/Type-Defensive%20Security%20Tool-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Focus-Anti--Infostealer-red.svg)](#)
 [![Built With](https://img.shields.io/badge/Built%20With-AI%20Pair%20Programming-brightgreen.svg)](#)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#)
 
-**StealerHunter** adalah aplikasi desktop keamanan modern berbasis **C# (.NET 8 WPF)** yang dirancang khusus untuk memburu, menghentikan, dan membersihkan malware pencuri kata sandi (**Infostealer**) seperti **Lumma Stealer, RedLine, Stealc, Vidar, dan Raccoon**, serta mengamankan basis data kredensial dan *session cookies* peramban (browser).
+**StealerHunter** adalah perangkat lunak pertahanan siber desktop (*Defensive Anti-Malware Suite*) berbasis **C# (.NET 8 WPF)** yang dirancang khusus untuk memburu, menghentikan, dan membersihkan malware pencuri kata sandi (**Infostealer**) seperti **Lumma Stealer, RedLine, Stealc, Vidar, dan Raccoon**, serta mengamankan basis data kredensial dan *session cookies* peramban (browser).
 
 <p align="center">
   <img src="docs/screenshots/01_dashboard.png" alt="StealerHunter Scanner &amp; Dashboard" width="900">
@@ -87,14 +88,15 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
 
 ## 🚀 Fitur Utama
 
-1. **Auto-Start with Windows & System Tray Guard**:
-   * Opsi toggle **"Run on Windows Startup"** (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`).
-   * Mode **Silent Boot**: Berjalan otomatis di latar belakang tanpa memunculkan jendela besar yang mengganggu saat Windows menyala.
-   * **Minimize to System Tray**: Bersembunyi di area notifikasi pojok kanan bawah dengan menu konteks klik kanan.
-   * **Boot Quick Scan**: Pemindaian otomatis seketika saat komputer dinyalakan.
+1. **Hybrid Auto-Start & System Tray Guardian**:
+   * **Dual Task Scheduler & Registry Autorun**: Pendaftaran otomatis melalui Windows Task Scheduler (`/RL HIGHEST`) untuk menjalankan aplikasi dengan hak Administrator tanpa terblokir UAC saat login, sekaligus memicu entri Registry `HKCU\...\Run` agar resmi terdaftar di tab **Startup apps Task Manager**.
+   * **Mode Silent Background (`--silent`)**: Berjalan otomatis di latar belakang tanpa memunculkan jendela yang mengganggu saat Windows menyala.
+   * **Minimize to System Tray**: Bersembunyi di area notifikasi pojok kanan bawah dengan menu konteks interaktif.
+   * **Single-Instance Mutex & IPC Event**: Mencegah proses aplikasi berjalan ganda dan memfokuskan jendela utama saat aplikasi dibuka kembali.
 
 2. **Realtime %TEMP% & Staging Watcher (64KB Buffer & Shannon Entropy Engine)**:
-   * **Shannon Entropy Analysis**: Menghitung tingkat keacakan (*entropy*) berkas baru di folder `%TEMP%`. Berkas teks normal memiliki entropi 3.0–5.0; berkas hasil enkripsi/obfuscation malware (seperti Lumma/Stealc) yang disamarkan sebagai `.txt`, `.tmp`, atau `.dat` dengan entropi tinggi (≥ 7.15) akan langsung terdeteksi sebagai muatan eksfiltrasi curian.
+   * **Shannon Entropy Analysis**: Menghitung tingkat keacakan (*entropy*) berkas baru di folder `%TEMP%`. Berkas teks normal memiliki entropi 3.0–5.0; berkas hasil enkripsi/obfuscation malware (seperti Lumma/Stealc) yang disamarkan sebagai `.txt`, `.tmp`, atau `.dat` dengan entropi tinggi (≥ 7.25) akan langsung terdeteksi sebagai muatan eksfiltrasi curian.
+   * **Whitelisting Cerdas untuk Developer**: Dilengkapi proteksi anti-false-positive komprehensif untuk seluruh rantai build pengembang (**Flutter, Dart, Java Bytecode, Gradle, Android NDK, CMake, Ninja, WebAssembly, Inno Setup, NPM, PyInstaller**).
    * **Buffer Kapasitas Tinggi 64 KB**: Mencegah terjadinya *InternalBufferOverflowException* saat aktivitas berkas sistem sedang padat.
    * Memergoki pembuatan file dump curian (`passwords.txt`, `cookies.txt`, `wallets`, atau arsip zip mencurigakan).
 
@@ -191,7 +193,7 @@ Proyek ini dilengkapi pengujian otomatis yang komprehensif (MSTest) mencakup det
 ```powershell
 dotnet test
 ```
-*Seluruh pengujian unit (**20/20**) terverifikasi lolos hijau (100% Passed).*
+*Seluruh pengujian unit (**25/25**) terverifikasi lolos hijau (100% Passed).*
 
 ---
 
@@ -213,7 +215,7 @@ stealer-hunter/
 │   ├── Resources/               # Styles.xaml (Modern Cyber Dark Theme), malware_db.json (Abuse.ch DB)
 │   ├── MainWindow.xaml/.cs      # Tampilan UI Dashboard & Tray Integration
 │   └── App.xaml/.cs             # Konfigurasi Aplikasi & Resource Dictionary
-└── StealerHunter.Tests/         # Proyek Unit Test (MSTest - 20 Pengujian Otomatis)
+└── StealerHunter.Tests/         # Proyek Unit Test (MSTest - 25 Pengujian Otomatis)
 ```
 
 ---
