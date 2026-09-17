@@ -160,6 +160,18 @@ public static class EntropyHelper
         if (header[0] == 0x4D && header[1] == 0x5A)
             return true;
 
+        // Java Bytecode / Class File (0xCAFEBABE)
+        if (header.Length >= 4 && header[0] == 0xCA && header[1] == 0xFE && header[2] == 0xBA && header[3] == 0xBE)
+            return true;
+
+        // ELF Linux/Android Shared Object / Binary (0x7F 'E' 'L' 'F')
+        if (header.Length >= 4 && header[0] == 0x7F && header[1] == 0x45 && header[2] == 0x4C && header[3] == 0x46)
+            return true;
+
+        // WebAssembly Binary (0x00 'a' 's' 'm')
+        if (header.Length >= 4 && header[0] == 0x00 && header[1] == 0x61 && header[2] == 0x73 && header[3] == 0x6D)
+            return true;
+
         return false;
     }
 
@@ -187,12 +199,19 @@ public static class EntropyHelper
             if (fi.Length < 512 || fi.Length > 6 * 1024 * 1024) return false;
 
             var fn = Path.GetFileName(filePath).ToLowerInvariant();
-            // Whitelist known installer / build / package manager streaming temp patterns
+            // Whitelist known installer / build / package manager / developer compiler streaming temp patterns
             if (System.Text.RegularExpressions.Regex.IsMatch(fn, @"^[0-9a-f]{8}-[0-9]+-[0-9]+\.tmp$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+                System.Text.RegularExpressions.Regex.IsMatch(fn, @"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
                 fn.StartsWith("is-", StringComparison.OrdinalIgnoreCase) ||
                 fn.StartsWith("npm-", StringComparison.OrdinalIgnoreCase) ||
                 fn.StartsWith("pip-", StringComparison.OrdinalIgnoreCase) ||
                 fn.StartsWith("yarn-", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("flutter_", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("dart_", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("gradle_", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("android_", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("ninja_", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("cmake_", StringComparison.OrdinalIgnoreCase) ||
                 fn.StartsWith("tmp.", StringComparison.OrdinalIgnoreCase) ||
                 fn.StartsWith("~", StringComparison.OrdinalIgnoreCase))
             {
