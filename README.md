@@ -98,11 +98,12 @@ Infostealer memiliki karakteristik serangan cepat berantai (*hit-and-run*):
    * **Minimize to System Tray**: Bersembunyi di area notifikasi pojok kanan bawah dengan menu konteks interaktif.
    * **Single-Instance Mutex & IPC Event**: Mencegah proses aplikasi berjalan ganda dan memfokuskan jendela utama saat aplikasi dibuka kembali.
 
-2. **Realtime %TEMP% & Staging Watcher (64KB Buffer & Shannon Entropy Engine)**:
-   * **Shannon Entropy Analysis**: Menghitung tingkat keacakan (*entropy*) berkas baru di folder `%TEMP%`. Berkas teks normal memiliki entropi 3.0–5.0; berkas hasil enkripsi/obfuscation malware (seperti Lumma/Stealc) yang disamarkan sebagai `.txt`, `.tmp`, atau `.dat` dengan entropi tinggi (≥ 7.25) akan langsung terdeteksi sebagai muatan eksfiltrasi curian.
-   * **Whitelisting Cerdas untuk Developer**: Dilengkapi proteksi anti-false-positive komprehensif untuk seluruh rantai build pengembang (**Flutter, Dart, Java Bytecode, Gradle, Android NDK, CMake, Ninja, WebAssembly, Inno Setup, NPM, PyInstaller**).
+2. **Realtime %TEMP% & Staging Watcher (Contextual Entropy & Deep Credential Content Inspection)**:
+   * **Deep Credential Content Inspection**: Memindai struktur data curian nyata (*staged plaintext/SQLite dumps*) secara instan pada semua berkas temporer (mencari pola triplet `URL:`, `USER:`, `PASS:`, `CREATE TABLE logins`, *cryptographic private keys*, dan *crypto wallet seed phrases*) terlepas dari nama atau ekstensi berkas yang digunakan malware.
+   * **Contextual Shannon Entropy Analysis**: Menghitung tingkat keacakan (*entropy*) khusus pada berkas yang disamarkan sebagai teks atau konfigurasi data (`.txt`, `.log`, `.dat`, `.json`, `.csv`, `.ini`). Berkas teks normal berentropi 3.0–5.0; berkas hasil enkripsi/obfuscation malware (Lumma/Stealc) dengan entropi tinggi (≥ 7.25) akan langsung terdeteksi sebagai muatan eksfiltrasi curian.
+   * **Whitelisting Cerdas Berstandar EDR**: Mengeliminasi *false positive* secara permanen pada proses Windows Update (`cab*.tmp`), kompilasi developer (**Flutter, Dart, Java Bytecode, Gradle, Android NDK, CMake, Ninja, WebAssembly, Inno Setup, NPM, PyInstaller**), dan *cache* biner resmi.
    * **Buffer Kapasitas Tinggi 64 KB**: Mencegah terjadinya *InternalBufferOverflowException* saat aktivitas berkas sistem sedang padat.
-   * Memergoki pembuatan file dump curian (`passwords.txt`, `cookies.txt`, `wallets`, atau arsip zip mencurigakan).
+   * Memergoki pembuatan berkas dump curian (`passwords.txt`, `cookies.txt`, `wallets`, atau arsip zip eksfiltrasi).
 
 3. **Browser Vault Integrity Shield**:
    * Memeriksa integritas database kredensial untuk **Google Chrome, Microsoft Edge, Brave, Mozilla Firefox, Opera Stable, Opera GX, dan Vivaldi**.
