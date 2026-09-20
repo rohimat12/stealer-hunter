@@ -98,6 +98,11 @@ public class RealtimeWatcherService : IDisposable
             // Skip legitimate build tools, package managers, compilers, and runtime temporary extractions
             if (name.Contains("_mei") ||
                 name.Contains("base_library.zip") ||
+                name.StartsWith("cab", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("wct", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("msi", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("cbs", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("etilqs", StringComparison.OrdinalIgnoreCase) ||
                 name.StartsWith("npm-", StringComparison.OrdinalIgnoreCase) ||
                 name.StartsWith("pip-", StringComparison.OrdinalIgnoreCase) ||
                 name.StartsWith("yarn-", StringComparison.OrdinalIgnoreCase) ||
@@ -111,6 +116,7 @@ public class RealtimeWatcherService : IDisposable
                 name.Contains("nuget") ||
                 name.Contains("hsperfdata") ||
                 name.Contains("flutter_tools") ||
+                System.Text.RegularExpressions.Regex.IsMatch(name, @"^cab[0-9a-f]+\.tmp$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
                 System.Text.RegularExpressions.Regex.IsMatch(name, @"^[0-9a-f]{8}-[0-9]+-[0-9]+\.tmp$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
                 System.Text.RegularExpressions.Regex.IsMatch(name, @"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
             {

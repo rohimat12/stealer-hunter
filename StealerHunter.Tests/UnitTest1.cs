@@ -2,6 +2,8 @@ using System.IO;
 using StealerHunter.Models;
 using StealerHunter.Services;
 
+[assembly: DoNotParallelize]
+
 namespace StealerHunter.Tests;
 
 [TestClass]

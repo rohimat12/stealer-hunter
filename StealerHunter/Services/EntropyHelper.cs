@@ -172,6 +172,14 @@ public static class EntropyHelper
         if (header.Length >= 4 && header[0] == 0x00 && header[1] == 0x61 && header[2] == 0x73 && header[3] == 0x6D)
             return true;
 
+        // Microsoft Cabinet (CAB) Archive ("MSCF")
+        if (header.Length >= 4 && header[0] == 0x4D && header[1] == 0x53 && header[2] == 0x43 && header[3] == 0x46)
+            return true;
+
+        // InstallShield Cabinet Archive ("ISc(")
+        if (header.Length >= 4 && header[0] == 0x49 && header[1] == 0x53 && header[2] == 0x63 && header[3] == 0x28)
+            return true;
+
         return false;
     }
 
@@ -202,6 +210,12 @@ public static class EntropyHelper
             // Whitelist known installer / build / package manager / developer compiler streaming temp patterns
             if (System.Text.RegularExpressions.Regex.IsMatch(fn, @"^[0-9a-f]{8}-[0-9]+-[0-9]+\.tmp$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
                 System.Text.RegularExpressions.Regex.IsMatch(fn, @"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+                System.Text.RegularExpressions.Regex.IsMatch(fn, @"^cab[0-9a-f]+\.tmp$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+                fn.StartsWith("cab", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("wct", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("msi", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("cbs", StringComparison.OrdinalIgnoreCase) ||
+                fn.StartsWith("etilqs_", StringComparison.OrdinalIgnoreCase) ||
                 fn.StartsWith("is-", StringComparison.OrdinalIgnoreCase) ||
                 fn.StartsWith("npm-", StringComparison.OrdinalIgnoreCase) ||
                 fn.StartsWith("pip-", StringComparison.OrdinalIgnoreCase) ||
