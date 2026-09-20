@@ -30,10 +30,12 @@ Format mengikuti standar [Keep a Changelog](https://keepachangelog.com/en/1.0.0/
   - Sinkronisasi status tombol: tombol *Stop* hanya aktif saat pemindaian berlangsung, dan tombol scan terkunci saat aktif.
 
 ### ⚡ Ditingkatkan & Diperbaiki (Changed & Fixed)
-- **🔬 Heuristik Entropi Shannon & Anti-False-Positive:**
-  - Menambahkan pengenalan header runtime engine JavaScript V8/Chromium (`v8`) untuk mencegah deteksi keliru pada cache aplikasi (seperti IDE/Browser).
-  - Menambahkan whitelist untuk struktur tabel biner terformat (*zero-padded headers*) dan DirectX Shader Bytecode (`DXBC`).
-  - Menyesuaikan batas ukuran kandidat staging kredensial yang realistis (1 KB – 4 MB).
+- **🧠 Deep Credential Content Inspection (EDR Standard):**
+  - Pemindaian struktur data curian nyata (*plaintext credentials*, format triplet `URL:`, `USER:`, `PASS:`, kunci privat kriptografi SSH/RSA, skema dump tabel SQLite browser, dan *crypto wallet seed phrases*) pada seluruh berkas temporer tanpa terpengaruh ekstensi.
+- **🔬 Kontekstualisasi Shannon Entropy & Zero-False-Positive Engine:**
+  - Membatasi kalkulasi Shannon Entropy khusus pada berkas yang menyamar sebagai teks/konfigurasi data normal (`.txt`, `.log`, `.csv`, `.json`, `.dat`, `.ini`).
+  - Mengeliminasi *false positive* secara permanen pada proses Windows Update (`cab*.tmp`), kompilasi developer (**Flutter, Dart, Java Bytecode, Gradle, Android NDK, CMake, Ninja, WebAssembly, Inno Setup, NPM, PyInstaller**), dan *cache* biner resmi.
+  - Menambahkan pengenalan *magic header* untuk Microsoft Cabinet (`MSCF`), InstallShield Cabinet (`ISc(`), JavaScript V8 engine (`v8`), WebAssembly (`wasm`), Linux/Android binary (`ELF`), dan DirectX Shader Bytecode (`DXBC`).
 - **🛡️ Hardened Chunked XOR Quarantine Engine:**
   - Pengolahan streaming biner 64 KB per chunk untuk mencegah *OutOfMemoryException* pada berkas besar.
   - *Immunity Safeguards*: Proteksi mutlak agar database browser (*Login Data, Cookies*) dan direktori sistem (*System32, Program Files*) tidak terhapus tidak sengaja.
