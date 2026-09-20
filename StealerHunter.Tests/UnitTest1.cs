@@ -597,8 +597,8 @@ public class SecurityServicesTests
 
         try
         {
-            // 1. Create a fake PNG image file in temp (high entropy due to compression, but standard magic header)
-            var fakePng = Path.Combine(tempFolder, "cache_image.tmp");
+            // 1. Create a fake PNG image file disguised as .dat in temp (high entropy due to compression, but standard magic header)
+            var fakePng = Path.Combine(tempFolder, "cache_image.dat");
             var pngBytes = new byte[2048];
             new Random(42).NextBytes(pngBytes); // Random high entropy
             // Write PNG Magic Header
@@ -610,7 +610,7 @@ public class SecurityServicesTests
             Assert.IsFalse(pngFlagged, "Legitimate PNG header must NEVER be flagged as suspicious staging dump");
 
             // 2. Create a fake JPEG image file in temp
-            var fakeJpg = Path.Combine(tempFolder, "photo_cache.tmp");
+            var fakeJpg = Path.Combine(tempFolder, "photo_cache.dat");
             var jpgBytes = new byte[2048];
             new Random(43).NextBytes(jpgBytes);
             // Write JPEG Magic Header
@@ -622,7 +622,7 @@ public class SecurityServicesTests
             Assert.IsFalse(jpgFlagged, "Legitimate JPEG header must NEVER be flagged as suspicious staging dump");
 
             // 3. Create a RAW high-entropy encrypted dump without standard headers (actual Lumma/Stealc obfuscated log)
-            var rawMalwareDump = Path.Combine(tempFolder, "staged_dump.tmp");
+            var rawMalwareDump = Path.Combine(tempFolder, "staged_dump.dat");
             var rawDumpBytes = new byte[2048];
             new Random(44).NextBytes(rawDumpBytes); // Pure random raw bytes
             // Ensure first byte isn't a known header
@@ -633,6 +633,21 @@ public class SecurityServicesTests
             bool rawFlagged = StealerHunter.Services.EntropyHelper.IsSuspiciousHighEntropyStaging(rawMalwareDump, out var rawEntropy);
             Assert.IsTrue(rawFlagged, "Raw high-entropy encrypted buffer without standard headers MUST be flagged");
             Assert.IsTrue(rawEntropy >= 7.25, $"Calculated entropy ({rawEntropy}) should exceed threshold");
+
+            // 4. Test ContainsPlaintextCredentials on arbitrary named file (.tmp, .bin, .cache)
+            var fakeDumpTmp = Path.Combine(tempFolder, "random_xyz_998.tmp");
+            File.WriteAllText(fakeDumpTmp, "URL: https://accounts.google.com\nUSER: admin@victim.com\nPASS: SuperSecretP@ssw0rd123!\nSOFT: Google Chrome");
+
+            bool credDetected = StealerHunter.Services.EntropyHelper.ContainsPlaintextCredentials(fakeDumpTmp, out var reason);
+            Assert.IsTrue(credDetected, "Plaintext credential markers in arbitrary .tmp files MUST be detected 100%");
+            Assert.IsTrue(reason.Contains("URL / USER / PASS"), $"Reason should identify credential format: {reason}");
+
+            // 5. Test ContainsPlaintextCredentials ignores benign build/temp files
+            var cleanTemp = Path.Combine(tempFolder, "flutter_build_state.tmp");
+            File.WriteAllText(cleanTemp, "build_id: 123456\nstatus: completed\ntimestamp: 2026-09-20T12:00:00Z");
+
+            bool cleanDetected = StealerHunter.Services.EntropyHelper.ContainsPlaintextCredentials(cleanTemp, out _);
+            Assert.IsFalse(cleanDetected, "Benign non-credential temp files must NEVER be flagged");
         }
         finally
         {

@@ -148,11 +148,22 @@ public class RealtimeWatcherService : IDisposable
                 return;
             }
 
-            // High-entropy encrypted credential staging detection (Lumma, Stealc mutation)
+            // Deep inspection of file content if it exists
             if (File.Exists(fullPath))
             {
+                // 1. Plaintext credential dump inspection (catches dumps regardless of extension, e.g. .tmp, .dat, .log, .xyz)
+                if (EntropyHelper.ContainsPlaintextCredentials(fullPath, out var credReason))
+                {
+                    SuspiciousActivityDetected?.Invoke(
+                        $"Harvested Credential Dump: '{rawName}' ({credReason})",
+                        fullPath
+                    );
+                    return;
+                }
+
+                // 2. High-entropy encrypted credential staging detection (only for disguised text/data extensions)
                 var ext = Path.GetExtension(name);
-                if (ext is ".txt" or ".tmp" or ".dat" or ".log")
+                if (ext is ".txt" or ".log" or ".dat" or ".json" or ".csv" or ".ini")
                 {
                     if (EntropyHelper.IsSuspiciousHighEntropyStaging(fullPath, out var entropy))
                     {

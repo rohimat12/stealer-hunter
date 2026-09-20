@@ -60,6 +60,11 @@ public class StagedDataHunter
                         var fn = Path.GetFileName(file);
                         if (StealerDumpKeywords.Contains(fn)) matchCount++;
 
+                        if (EntropyHelper.ContainsPlaintextCredentials(file, out _))
+                        {
+                            matchCount++;
+                        }
+
                         if (EntropyHelper.IsSuspiciousHighEntropyStaging(file, out _))
                         {
                             hasHighEntropyDump = true;
@@ -121,17 +126,37 @@ public class StagedDataHunter
                 }
             }
 
-            // Also check for high-entropy obfuscated/encrypted credential dumps (Lumma, Stealc staging)
+            // Also check candidate files in temporary folders
             var candidateFiles = Directory.GetFiles(rootDir, "*.*");
             foreach (var candidate in candidateFiles)
             {
-                var ext = Path.GetExtension(candidate).ToLowerInvariant();
-                if (ext is ".txt" or ".tmp" or ".dat" or ".bin" or ".log")
+                try
                 {
-                    try
+                    var fi = new FileInfo(candidate);
+                    if (fi.Length is < 32 or > 15_000_000 || (now - fi.LastWriteTime).TotalDays > 7) continue;
+
+                    // 1. Check for plaintext credential markers in ANY file (e.g. .tmp, .dat, .log, .txt, etc.)
+                    if (EntropyHelper.ContainsPlaintextCredentials(candidate, out var credReason))
                     {
-                        var fi = new FileInfo(candidate);
-                        if (fi.Length is >= 1_024 and <= 4_000_000 && (now - fi.LastWriteTime).TotalDays <= 7)
+                        var threat = new ThreatItem
+                        {
+                            Name = $"Harvested Credential Dump: {Path.GetFileName(candidate)}",
+                            Category = ThreatCategory.StagedExfiltrationData,
+                            Severity = ThreatSeverity.Critical,
+                            Description = $"Staged credential dump detected in temporary folder ({credReason}): '{candidate}'",
+                            FilePath = candidate,
+                            TargetTarget = "Staged Credential Dump"
+                        };
+                        threats.Add(threat);
+                        logCallback?.Invoke("DANGER", $"[CRITICAL] Staged credential dump detected: {candidate} ({credReason})");
+                        continue;
+                    }
+
+                    // 2. High-entropy encrypted credential dumps (only disguised text/data extensions)
+                    var ext = Path.GetExtension(candidate).ToLowerInvariant();
+                    if (ext is ".txt" or ".log" or ".dat" or ".json" or ".csv" or ".ini")
+                    {
+                        if (fi.Length is >= 512 and <= 6_000_000)
                         {
                             if (EntropyHelper.IsSuspiciousHighEntropyStaging(candidate, out var entropy))
                             {
@@ -149,10 +174,10 @@ public class StagedDataHunter
                             }
                         }
                     }
-                    catch
-                    {
-                        // Ignore locked or inaccessible files
-                    }
+                }
+                catch
+                {
+                    // Ignore locked or inaccessible files
                 }
             }
         }

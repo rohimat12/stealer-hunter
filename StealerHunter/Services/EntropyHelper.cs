@@ -186,7 +186,7 @@ public static class EntropyHelper
     /// <summary>
     /// Returns true if a text/staging file shows suspicious high entropy (&gt; 7.25)
     /// without matching standard media/archive magic headers, indicating encrypted
-    /// or packed credential dumps disguised as normal files.
+    /// or packed credential dumps disguised as normal data files (.txt, .log, .csv, .json, .dat, .ini).
     /// </summary>
     public static bool IsSuspiciousHighEntropyStaging(string filePath, out double entropy)
     {
@@ -196,7 +196,9 @@ public static class EntropyHelper
             if (!File.Exists(filePath)) return false;
 
             var ext = Path.GetExtension(filePath).ToLowerInvariant();
-            if (ext is not (".txt" or ".log" or ".csv" or ".json" or ".dat" or ".tmp" or ".bin"))
+            // Strictly check files masquerading as human-readable text or data configuration.
+            // Generic .tmp/.bin binary streams are evaluated by credential content inspection, not blind entropy.
+            if (ext is not (".txt" or ".log" or ".csv" or ".json" or ".dat" or ".ini"))
             {
                 return false;
             }
@@ -248,6 +250,93 @@ public static class EntropyHelper
 
             entropy = CalculateFileEntropy(filePath);
             return entropy >= 7.25;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Scans the initial segment of a file (up to 64 KB) for distinctive plaintext credential dump markers.
+    /// This catches credential exfiltration dumps regardless of file extension (e.g. random.tmp, cache.dat, log.txt, system.bin).
+    /// </summary>
+    public static bool ContainsPlaintextCredentials(string filePath, out string matchedReason)
+    {
+        matchedReason = string.Empty;
+        try
+        {
+            if (!File.Exists(filePath)) return false;
+
+            var fi = new FileInfo(filePath);
+            if (fi.Length < 32 || fi.Length > 15 * 1024 * 1024) return false;
+
+            // Read up to 64 KB
+            byte[] buffer = new byte[(int)Math.Min(fi.Length, 65536)];
+            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                int read = fs.Read(buffer, 0, buffer.Length);
+                if (read < 32) return false;
+            }
+
+            // Skip legitimate binary formats immediately (images, standard archives, executables)
+            if (IsLegitimateStandardFormat(buffer)) return false;
+
+            // Convert buffer to UTF-8 text representation for pattern analysis
+            string content = System.Text.Encoding.UTF8.GetString(buffer);
+
+            // 1. Check for standard Stealer credential dump signature (URL + USER + PASS)
+            bool hasUrl = content.Contains("URL:", StringComparison.OrdinalIgnoreCase) ||
+                          content.Contains("HOST:", StringComparison.OrdinalIgnoreCase) ||
+                          content.Contains("HOSTNAME:", StringComparison.OrdinalIgnoreCase) ||
+                          content.Contains("Site:", StringComparison.OrdinalIgnoreCase);
+
+            bool hasUser = content.Contains("USER:", StringComparison.OrdinalIgnoreCase) ||
+                           content.Contains("USERNAME:", StringComparison.OrdinalIgnoreCase) ||
+                           content.Contains("LOGIN:", StringComparison.OrdinalIgnoreCase) ||
+                           content.Contains("Username:", StringComparison.OrdinalIgnoreCase) ||
+                           content.Contains("Login:", StringComparison.OrdinalIgnoreCase);
+
+            bool hasPass = content.Contains("PASS:", StringComparison.OrdinalIgnoreCase) ||
+                           content.Contains("PASSWORD:", StringComparison.OrdinalIgnoreCase) ||
+                           content.Contains("Password:", StringComparison.OrdinalIgnoreCase) ||
+                           content.Contains("Pass:", StringComparison.OrdinalIgnoreCase);
+
+            if ((hasUrl && hasUser && hasPass) || (hasUser && hasPass && content.Contains("SOFT:", StringComparison.OrdinalIgnoreCase)))
+            {
+                matchedReason = "Stealer Credential Dump Format (URL / USER / PASS)";
+                return true;
+            }
+
+            // 2. Cryptographic Private Keys (SSH, RSA, EC)
+            if (content.Contains("-----BEGIN PRIVATE KEY-----", StringComparison.Ordinal) ||
+                content.Contains("-----BEGIN RSA PRIVATE KEY-----", StringComparison.Ordinal) ||
+                content.Contains("-----BEGIN OPENSSH PRIVATE KEY-----", StringComparison.Ordinal) ||
+                content.Contains("-----BEGIN EC PRIVATE KEY-----", StringComparison.Ordinal))
+            {
+                matchedReason = "Harvested Cryptographic Private Key Dump";
+                return true;
+            }
+
+            // 3. Browser SQLite Schema Dumps
+            if (content.Contains("CREATE TABLE logins (", StringComparison.OrdinalIgnoreCase) ||
+                content.Contains("CREATE TABLE moz_logins (", StringComparison.OrdinalIgnoreCase) ||
+                content.Contains("CREATE TABLE autofill (", StringComparison.OrdinalIgnoreCase))
+            {
+                matchedReason = "Raw Browser Credential Database Table Dump";
+                return true;
+            }
+
+            // 4. Crypto Wallet Seed / Mnemonic dumps
+            if (content.Contains("Secret Recovery Phrase", StringComparison.OrdinalIgnoreCase) ||
+                content.Contains("Mnemonic Phrase:", StringComparison.OrdinalIgnoreCase) ||
+                (content.Contains("wallet.dat", StringComparison.OrdinalIgnoreCase) && content.Contains("passphrase", StringComparison.OrdinalIgnoreCase)))
+            {
+                matchedReason = "Harvested Crypto Wallet Seed/Keyphrase Dump";
+                return true;
+            }
+
+            return false;
         }
         catch
         {
